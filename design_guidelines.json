@@ -1,0 +1,88 @@
+{
+  "theme": "Light",
+  "archetype": "1 (Organic & Earthy / Trust Hybrid)",
+  "brand_colors": {
+    "primary": "#111827",
+    "accent": "#10B981",
+    "secondary": "#F59E0B",
+    "background": "#F9FAFB",
+    "surface": "#FFFFFF",
+    "border": "rgba(17, 24, 39, 0.1)",
+    "text_dark": "#111827",
+    "text_light": "#F9FAFB"
+  },
+  "typography": {
+    "headings": "Cabinet Grotesk",
+    "body": "Manrope",
+    "rules": [
+      "No generic sans (Inter/Roboto) for headings.",
+      "Tight letter spacing on headings (>32px) using tracking-tight.",
+      "Overlines/Labels must be uppercase, tiny, wide spacing (tracking-[0.2em]).",
+      "Do not exceed text-6xl for the main hero heading.",
+      "Use varying weights (Light vs Black) to create tension."
+    ]
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous Spacing (p-6 to p-12).",
+    "grid_system": "Dashboard uses Mode B 'Control Room' for density. Marketing uses Mode A 'Tetris' for asymmetry.",
+    "form_layout": "Form is the conversion centerpiece. Use a soft Neumorphic card or solid white surface over the dark hero to make it pop.",
+    "borders": "1px subtle borders on widgets to define edges without relying on heavy shadows."
+  },
+  "components": {
+    "navigation": "Sticky, Crystal Glassmorphism (bg-white/70 backdrop-blur-xl) on light pages, or Solid dark on the hero section. Must contain prominent EN/FR/ES/KR language toggle.",
+    "hero": "Gradient dark->green transition. Use provided abstract background image with bg-black/50 overlay to house the recharge form and '⚡ Recharge Instantane' badge.",
+    "recharge_form": "Inviting, confidence-inspiring. 4 steps: Operator -> Phone (with country flag dropdown) -> Amount (Quick buttons $5, $10, etc., 'POPULÈ' badge) -> Pay.",
+    "trust_badges": "Row below hero. Icons + Text: Instantané, Sécurisé, 150+ Peyi, 3000+ Kliyan.",
+    "operator_logos": "Border-collapse grid. Logos appear desaturated (grayscale) and gain full color on hover.",
+    "dashboard_and_history": "Greeting, quick recharge buttons (Saved Contacts), recent tx list. History needs robust filters. Status badges: Green (Success), Amber (Pending), Red (Failed).",
+    "footer": "Must contain explicit link to parent site monican.shop."
+  },
+  "motion_and_interactions": {
+    "hover_states": "Buttons lift (-translate-y-1) and increase shadow. Explicit text color on hover.",
+    "form_steps": "Smooth staggered fade-ins for form steps.",
+    "loading": "Use subtle spinning icons or pulsing skeleton loaders, avoid full-page blocks."
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "installation": "yarn add @phosphor-icons/react",
+    "usage": "Use duotone or regular weights for a premium fintech feel."
+  },
+  "media": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1763386599810-e31937993312?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwxfHxkYXJrJTIwZ3JlZW4lMjBhYnN0cmFjdCUyMGdyYWRpZW50JTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3NzcxNTI5MTd8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Dark teal and green abstract gradient background for the hero section."
+    },
+    "lifestyle_image": {
+      "url": "https://images.unsplash.com/photo-1768244016593-8ca75b15bc92?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHw0fHxwZW9wbGUlMjB1c2luZyUyMG1vYmlsZSUyMHBob25lJTIwc21pbGluZyUyMHZpYnJhbnR8ZW58MHx8fHwxNzc3MTUyODk4fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Smiling person using phone, for 'How it works' or about section."
+    },
+    "operator_logos": {
+      "digicel": "https://logo.clearbit.com/digicelgroup.com",
+      "natcom": "https://logo.clearbit.com/natcom.com.ht",
+      "att": "https://logo.clearbit.com/att.com",
+      "tmobile": "https://logo.clearbit.com/t-mobile.com",
+      "verizon": "https://logo.clearbit.com/verizon.com",
+      "rogers": "https://logo.clearbit.com/rogers.com",
+      "bell": "https://logo.clearbit.com/bell.ca"
+    },
+    "payment_logos": {
+      "stripe": "https://logo.clearbit.com/stripe.com",
+      "moncash": "https://logo.clearbit.com/digicelgroup.com"
+    }
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure text over hero background meets APCA 3:1 for large text.",
+    "test_ids": "Mandatory data-testid on all interactive and key informational elements (e.g., data-testid='recharge-submit-btn', data-testid='lang-toggle-kr').",
+    "reduced_motion": "Respect prefers-reduced-motion media query."
+  },
+  "instructions_to_main_agent": [
+    "Build a Next.js 14 App Router application focusing heavily on the central recharge form's UX.",
+    "Use the dark green background image with a bg-black/50 overlay for the hero section.",
+    "Implement the multi-language toggle (EN/FR/ES/KR) in the navigation.",
+    "For the main form, avoid standard Shadcn Card component. Build a premium custom layout.",
+    "Use Phosphor Icons for the trust badges and dashboard.",
+    "Create a grid for the 'Supported Operators' section displaying the provided Clearbit logo URLs. Make them grayscale by default and colored on hover.",
+    "Dashboard and History pages should use a dense 'Control Room' layout.",
+    "Ensure all interactive elements have proper data-testid attributes for testing."
+  ]
+}
