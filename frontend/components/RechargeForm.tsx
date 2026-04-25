@@ -145,8 +145,8 @@ export function RechargeForm({ compact = false }: { compact?: boolean }) {
   const stepDots = [1, 2, 3, 4];
 
   return (
-    <div data-testid="recharge-form" className={`relative ${compact ? "" : "mx-auto w-full max-w-xl"}`}>
-      <div className="rounded-3xl border border-black/5 bg-white p-2 shadow-[0_30px_80px_-20px_rgba(17,24,39,0.4)]">
+    <div data-testid="recharge-form" className={`relative text-brand-ink ${compact ? "" : "mx-auto w-full max-w-xl"}`}>
+      <div className="rounded-3xl border border-black/5 bg-white p-2 text-brand-ink shadow-[0_30px_80px_-20px_rgba(17,24,39,0.4)]">
         {/* Step indicator */}
         <div className="flex items-center justify-between rounded-2xl bg-brand-bg px-4 py-3">
           <div className="flex items-center gap-2">
@@ -461,7 +461,7 @@ export function RechargeForm({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
-      <p className="mt-3 flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.18em] text-black/40">
+      <p className="mt-3 flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/50 mix-blend-difference">
         <Phone className="h-3 w-3" /> 100% SECURE · INSTANT · 150+ COUNTRIES
       </p>
     </div>

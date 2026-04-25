@@ -103,7 +103,7 @@ export default function SignupPage() {
             <div className="h-px flex-1 bg-black/10" /> OR <div className="h-px flex-1 bg-black/10" />
           </div>
 
-          <Button data-testid="signup-google" onClick={handleGoogle} variant="outline" size="lg" className="w-full">
+          <Button data-testid="signup-google" onClick={handleGoogle} variant="outline" size="lg" className="w-full" disabled={!configured}>
             <GoogleLogo weight="bold" className="h-5 w-5" /> {t("auth.google")}
           </Button>
 

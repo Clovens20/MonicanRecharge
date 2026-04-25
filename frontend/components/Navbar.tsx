@@ -102,6 +102,7 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
               <Link
                 key={l.href}
                 href={l.href}
+                data-testid={`mobile-nav-link-${l.href.replace("/", "") || "home"}`}
                 onClick={() => setOpen(false)}
                 className="block rounded-xl px-3 py-2 text-sm font-medium text-brand-ink hover:bg-black/5"
               >
