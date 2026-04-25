@@ -1,0 +1,47 @@
+{
+  "summary": "Frontend e2e testing of Monican Recharge Next.js app. UI renders correctly across all pages (landing, dashboard, history, contacts, login, signup) with all expected data-testids present. Language toggle (EN/FR/ES/KR) works and persists in localStorage as 'monican_lang'. Contacts and dashboard quick-data flows work via localStorage. CRITICAL infrastructure bug: every Next.js API route under /api/* returns 404 on the public URL because the Kubernetes ingress routes /api/* to FastAPI on port 8001 (which has no such routes), not to Next.js on port 3000. This breaks: auto-detect, operators, data-bundles, and the recharge submit (toast 'Failed', no redirect to dashboard, no transaction created). Internally on localhost:3000 the Next.js routes work fine. Also found two visual contrast bugs on the recharge form rendered over the dark hero.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/reloadly/operators", "issue": "Public URL returns 404 with FastAPI '{\"detail\":\"Not Found\"}'. Internally curl http://localhost:3000/api/reloadly/operators works. Ingress routes /api/* to FastAPI:8001, bypassing Next.js API routes.", "priority": "CRITICAL"},
+      {"endpoint": "/api/reloadly/auto-detect", "issue": "Same as above — 404 on public URL. Phone detection still appears to work in the form because detectOperator() runs client-side from mock.ts, but the API endpoint itself is unreachable.", "priority": "CRITICAL"},
+      {"endpoint": "/api/reloadly/data-bundles", "issue": "404 on public URL. Same root cause.", "priority": "CRITICAL"},
+      {"endpoint": "/api/recharge/send", "issue": "404 on public URL. STEP 4 'Send Recharge Now' triggers fetch which returns 404 → toast 'Failed', no transaction saved, no redirect to /tableau-de-bord. End-to-end recharge flow is broken in production.", "priority": "CRITICAL"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RechargeForm STEP 1 operator cards (over dark hero)", "issue": "Operator names 'Digicel Haiti' / 'Natcom Haiti' appear invisible because the cards inherit text-white from the dark hero parent while sitting on a white card background. Visible text in screenshot is only 'Haiti' subtitle (text-black/50). Operator name `font-display font-bold tracking-tight` has no explicit color so it inherits white from hero.", "selector": "[data-testid='op-card-173'] / op-card-528", "priority": "HIGH"},
+      {"component": "RechargeForm STEP 4 summary card", "issue": "Right-hand values (operator name, recipient phone, type label, total amount) render with very low opacity / inherited light color and are nearly unreadable on the white summary card. Only labels on the left and 'Send Recharge Now' button are readable.", "selector": "[data-testid='recharge-form'] STEP 4 summary", "priority": "HIGH"},
+      {"component": "RechargeForm STEP 4 'Credit / Debit Card' option", "issue": "Inside pay-stripe selected card, the heading 'Credit/Debit Card' text appears invisible against the emerald-50 selected background — likely same color-inheritance bug.", "selector": "[data-testid='pay-stripe']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Recharge submission", "issue": "submit-recharge → POST /api/recharge/send → 404 → toast 'Failed'. Transaction never saved, dashboard/history empty after attempt. Caused by the API routing infra issue.", "affected_selectors": ["[data-testid='submit-recharge']", "[data-testid='operator-detected']"]},
+      {"flow": "Operator detection chip", "issue": "Works coincidentally because detectOperator runs client-side, but if dev later switches to fetch('/api/reloadly/auto-detect') as documented in test brief, it will silently fail."}
+    ],
+    "design_issues": [
+      {"screen": "Hero / RechargeForm", "issues": ["Color inheritance from dark hero leaks into white form children causing invisible text in operator cards and STEP 4 summary"]},
+      {"screen": "konekte/enskri", "issues": ["Supabase warning yellow banner renders correctly with data-testid='supabase-warning' as expected"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "[CRITICAL] Make Next.js /api/* routes reachable through the public URL. The K8s ingress routes /api/* to backend:8001 (FastAPI) — pick ONE: (a) stop FastAPI/proxy /api/* from FastAPI to Next.js port 3000, (b) move Next.js API routes to a non-/api prefix (e.g. /next-api/*) and update all fetch calls in RechargeForm/components, or (c) re-implement the four endpoints in /app/backend/server.py using FastAPI. Without this, recharge submission, auto-detect, operators, data-bundles all 404 in production.",
+    "[HIGH] Fix text color leakage on RechargeForm operator cards and STEP 4 summary. Add explicit `text-brand-ink` (or text-black) on `font-display` headings inside the white form so they don't inherit text-white from the dark hero parent. Affected: STEP 1 op-card-173/528 operator names, STEP 4 summary right-side values, pay-stripe label.",
+    "[MEDIUM] Verify pay-moncash and pay-stripe selected-state contrast across both light/dark contexts."
+  ],
+  "critical_code_review_comments": [
+    "RechargeForm.tsx STEP 1/STEP 4 typography classes lack explicit text color and rely on parent — fragile when reused inside dark sections.",
+    "/app/frontend/lib/reloadly/mock.ts is sound for client-side detection but the API routes that wrap it are unreachable from the public URL — high risk of silent failures once mocks are replaced with real Reloadly SDK calls that must go server-side.",
+    "Supabase client gracefully returns null when keys are empty; warning banner is shown — good UX. login-google and signup-google buttons still rendered but should be disabled when supabase is not configured to avoid confusing clicks.",
+    "Mobile burger menu does not include data-testid on the nav links inside the menu (only on the desktop header). Add data-testid='mobile-nav-link-{home|tableau-de-bord|istwa|kontak}' for testability."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "0% (all 4 Next.js API routes unreachable on public URL)", "frontend": "85% (all pages, nav, lang toggle, contacts, history, dashboard render and respond — only recharge submit is blocked by the API 404)"},
+  "test_credentials": "N/A — Supabase intentionally unconfigured per user's instructions (warning banner expected and verified).",
+  "seed_data_creation": "Created 1 contact 'Manman / 34111111' via UI in localStorage during testing.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Issue confirmed via curl: public URL `/api/reloadly/operators` returns FastAPI 404, but localhost:3000 returns valid JSON. Root cause is K8s ingress mapping /api/* → FastAPI:8001. After main agent fixes the routing, re-run the full RechargeForm 4-step flow including data plan tab (plan-dgc-2) and verify a transaction lands on /tableau-de-bord and /istwa. Also revisit the contrast issues on STEP 1 operator cards and STEP 4 summary.",
+  "rca of the issue": "The Next.js 14 app exposes its API as route handlers under /app/frontend/app/api/* (served by `next dev` on :3000). However, this Emergent preview environment ships with a Kubernetes ingress rule that always routes `/api/*` to the FastAPI backend on port 8001. The legacy /app/backend/server.py FastAPI does not implement these routes, so every call returns `{\"detail\":\"Not Found\"}` (FastAPI default). Reproduction: `curl https://recharge-preview-1.preview.emergentagent.com/api/reloadly/operators` → 404; `curl http://localhost:3000/api/reloadly/operators` → 200 JSON. Mitigation options listed in action_items above."
+}
