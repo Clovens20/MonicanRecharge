@@ -6,63 +6,53 @@ A professional mobile top-up platform — sub-platform of [monican.shop](https:/
 
 ## Stack
 
-- **Frontend**: Next.js 14 (App Router) + TypeScript + Tailwind + Phosphor Icons + Framer Motion
-- **Backend**: FastAPI + MongoDB (`/app/backend`)
+- **Application**: Next.js 14 (App Router) + TypeScript + Tailwind + API Routes (`/app/api/*`)
+- **Données**: MongoDB optionnelle (`MONGO_URL`) pour la collection `tranzaksyon`
 - **Auth**: Supabase (`@supabase/ssr`) — email/password + Google OAuth
 - **Payment**: Stripe (cards) + Moncash (mobile money)
-- **Recharge API**: Reloadly (currently mocked — plug keys to enable real send)
+- **Recharge API**: Reloadly (mock côté serveur si clés absentes)
 - **Languages**: EN / FR / ES / KR (Kreyòl Ayisyen)
 
-## Getting started
+## Démarrage
+
+À la racine du dépôt :
 
 ```bash
-# Frontend
-cd frontend
-yarn install
-yarn dev   # next dev -H 0.0.0.0 -p 3000
-
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+npm install
+npm run dev
 ```
 
-## Environment variables
+`npm run dev` choisit **automatiquement** le premier port libre entre **3100** et **3999** (plus d’erreur `EADDRINUSE` tant qu’il reste une plage libre). L’URL exacte s’affiche au démarrage dans le terminal.
 
-`frontend/.env`
+Plage personnalisée : `DEV_PORT_MIN=4000 DEV_PORT_MAX=4100 npm run dev`.
 
-```
-NEXT_PUBLIC_APP_URL=
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-RELOADLY_CLIENT_ID=
-RELOADLY_CLIENT_SECRET=
-RELOADLY_SANDBOX_MODE=true
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
+Ports fixes si tu préfères : `npm run dev:3000`, `dev:3001`, `dev:3100`.
+
+Build production :
+
+```bash
+npm run build
+npm run prod
 ```
 
-`backend/.env`
+## Variables d’environnement
 
-```
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=monican_recharge
-CORS_ORIGINS=*
-```
+Fichier **`.env` à la racine** (modèle : `.env.example`).
+
+Inclut : URL app, Supabase, Reloadly, Stripe, et optionnellement MongoDB pour l’historisation des recharges.
 
 ## Pages
 
-- `/` — Landing + central recharge form (4 steps)
-- `/konekte` — Login (FR/KR)
-- `/enskri` — Signup
-- `/tableau-de-bord` — User dashboard
-- `/istwa` — Transaction history
-- `/kontak` — Saved contacts
+- `/` — Landing + formulaire de recharge (4 étapes)
+- `/konekte` — Connexion
+- `/enskri` — Inscription
+- `/tableau-de-bord` — Tableau de bord
+- `/istwa` — Historique des transactions
+- `/kontak` — Contacts enregistrés
 
-## API endpoints (FastAPI `/api/*`)
+## API (Next.js `/api/*`)
 
+- `GET /api` — statut du service
 - `GET /api/reloadly/operators`
 - `POST /api/reloadly/auto-detect`
 - `GET /api/reloadly/data-bundles?operatorId=`

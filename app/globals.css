@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800,900&f[]=manrope@300,400,500,600,700&display=swap");
+
+:root {
+  --brand-ink: #111827;
+  --brand-green: #10B981;
+  --brand-gold: #F59E0B;
+  --brand-bg: #F9FAFB;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  background: var(--brand-bg);
+  color: var(--brand-ink);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection { background: rgba(16, 185, 129, 0.25); color: #064E3B; }
+
+.font-display { font-family: "Cabinet Grotesk", "Manrope", ui-sans-serif, system-ui, sans-serif; }
+
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(17, 24, 39, 0.06);
+}
+
+.dark-glass {
+  background: rgba(17, 24, 39, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #10B981 0%, #34D399 50%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-hero-gradient {
+  background: linear-gradient(135deg, #0a0e1a 0%, #0d1b2a 45%, #1a1035 100%);
+}
+
+.landing-hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.landing-gradient-accent {
+  background: linear-gradient(90deg, #00d084 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-cta-gradient {
+  background: linear-gradient(90deg, #00d084 0%, #14b8a6 100%);
+}
+
+.noise {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.06;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.btn-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.875rem 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-pill:hover { transform: translateY(-1px); }
+
+.lift:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.18); }
+
+.scroll-fade {
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+
+.stripe-line {
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 8px, transparent 8px 16px);
+}
+
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin-slow 12s linear infinite; }
+
+/* Hero landing — evite framer-motion sou chunk inisyal */
+@keyframes hero-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hero-fade-up {
+  animation: hero-fade-up 0.48s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+}
+.hero-fade-up-d1 { animation-delay: 0.06s; }
+.hero-fade-up-d2 { animation-delay: 0.12s; }
+.hero-fade-up-d3 { animation-delay: 0.18s; }
+.hero-fade-up-d4 { animation-delay: 0.24s; }
+.hero-fade-up-slow {
+  animation: hero-fade-up 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.12s;
+  opacity: 0;
+}
+
+/* ——— ZHONGJI / thermal 80mm (window.print) ——— */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #receipt,
+  #receipt * {
+    visibility: visible;
+  }
+  #receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    max-width: 80mm;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #000;
+    background: #fff;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}

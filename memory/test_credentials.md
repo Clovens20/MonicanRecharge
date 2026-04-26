@@ -2,8 +2,8 @@
 
 ## Auth (Supabase)
 **Status:** NOT CONFIGURED — user said they will add Supabase keys later.
-- `NEXT_PUBLIC_SUPABASE_URL` is empty in `/app/frontend/.env`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` is empty in `/app/frontend/.env`
+- `NEXT_PUBLIC_SUPABASE_URL` is empty in `.env` (repo root)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` is empty in `.env` (repo root)
 - Login/signup pages will display a yellow warning banner explaining keys are missing.
 - The app is fully demonstrable WITHOUT auth — recharge form works in demo/mock mode and stores transactions/contacts in localStorage so dashboard, history, and contacts pages display real data after using the form.
 

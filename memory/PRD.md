@@ -11,10 +11,10 @@ Build "Monican Recharge" at `recharge.monican.shop` — a professional mobile to
 - "map mete tout api key yo aprè" — will plug all keys later
 
 ## Architecture (date: 2026-04-25)
-- **Frontend**: Next.js 14 (App Router) + TypeScript + Tailwind + Phosphor Icons + Framer Motion + sonner. Replaces the original CRA template at `/app/frontend`.
-- **Backend**: FastAPI (`/app/backend/server.py`) + MongoDB (`tranzaksyon` collection). Hosts all `/api/*` endpoints because the Emergent K8s ingress routes `/api/*` exclusively to FastAPI:8001.
-- **Auth**: Supabase (`@supabase/ssr`) — client wired in `lib/supabase/{client,server}.ts`. When `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY` are empty (current state), `createClient()` returns `null` and pages render a yellow "Supabase not configured" warning.
-- **Recharge**: Reloadly is **MOCKED** in FastAPI (`OPERATORS`, `DATA_PLANS`, `detect_operator`). Replace with real Reloadly SDK once `RELOADLY_CLIENT_ID/SECRET` are added.
+- **Application**: Next.js 14 (App Router) à la racine du dépôt — UI + **Route Handlers** sous `app/api/*` (plus de serveur FastAPI séparé).
+- **Données**: MongoDB optionnelle via `MONGO_URL` / `DB_NAME` dans `.env` à la racine ; collection `tranzaksyon` pour persistance best-effort des recharges (même logique qu’avant).
+- **Auth**: Supabase (`@supabase/ssr`) — client dans `lib/supabase/{client,server}.ts`. Si `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY` sont vides, `createClient()` retourne `null` et les pages affichent l’avertissement « Supabase not configured ».
+- **Recharge**: Reloadly est **MOCKÉ** côté serveur dans les handlers API et partagé avec le client via `lib/reloadly/mock.ts`. Remplacer par le SDK Reloadly réel une fois les clés renseignées.
 - **Stripe**: env vars are placeholders. The "Pay with card" path returns mock success (no real charge) until keys are plugged in.
 - **Local fallback**: `lib/store.ts` mirrors transactions/contacts in `localStorage` so dashboard/history/contacts demo work without auth.
 
@@ -32,7 +32,7 @@ Build "Monican Recharge" at `recharge.monican.shop` — a professional mobile to
 - **History `/istwa`**: full transaction table, search by phone/operator, status filters (All/Success/Pending/Failed), CSV export.
 - **Contacts `/kontak`**: add/list/delete saved contacts with auto-detect operator on save, quick-recharge button per contact.
 - **i18n**: 4-language toggle (EN/FR/ES/KR) wired across all pages, persisted in shared `monican_lang` localStorage key (synced with monican.shop).
-- **API endpoints (FastAPI `/api/*`)**:
+- **API endpoints (Next.js `app/api/*`)**:
   - `GET /api/reloadly/operators`
   - `POST /api/reloadly/auto-detect`
   - `GET /api/reloadly/data-bundles?operatorId=`
@@ -42,7 +42,7 @@ Build "Monican Recharge" at `recharge.monican.shop` — a professional mobile to
 ## Backlog (priority-ordered)
 ### P0 — needed before public launch
 - Plug real **Supabase** project (URL + anon + service role) and run schema (profils, tranzaksyon, kontak_sove, peman_moncash, balans_reloadly + RLS).
-- Plug real **Reloadly** keys → switch FastAPI mock to real Reloadly SDK with token caching (1h TTL).
+- Plug real **Reloadly** keys → remplacer le mock des route handlers API par le SDK Reloadly avec cache token (1h TTL).
 - Plug real **Stripe** keys + create payment intent endpoint + webhook handler that calls `/recharge/send` only after `payment_intent.succeeded`.
 - Wire Supabase persistence in `RechargeForm` (write to `tranzaksyon` table, read on dashboard/history) so logged-in users sync across devices.
 
