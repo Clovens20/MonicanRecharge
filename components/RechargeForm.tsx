@@ -53,7 +53,7 @@ export function RechargeForm({
   /** Panel reçus (print / WhatsApp / email) : utile surtout pour caisse/agent. */
   showReceiptPanel?: boolean;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const L = visualMode === "landing";
   const router = useRouter();
   const pathname = usePathname();
@@ -121,6 +121,13 @@ export function RechargeForm({
   }, [type, amount, customAmount, plan]);
 
   const filteredPlans = operator ? DATA_PLANS.filter((p) => p.operatorId === operator.id) : [];
+
+  function detectedLine(op: Operator) {
+    if (!L) return `${t("form.detected")}: ${op.name}`;
+    const suffix =
+      lang === "fr" ? "détecté" : lang === "es" ? "detectado" : lang === "kr" ? "detekte" : "detected";
+    return `✅ ${op.name} ${suffix}`;
+  }
 
   function selectOperatorCard(opId: number) {
     const op = OPERATORS.find((o) => o.id === opId);
@@ -279,7 +286,7 @@ export function RechargeForm({
         )}
       >
         {/* Step indicator */}
-        {step === 5 ? (
+            {step === 5 ? (
           <div
             className={cn(
               "flex items-center justify-center gap-2 rounded-2xl px-4 py-3",
@@ -478,7 +485,7 @@ export function RechargeForm({
                         data-testid="operator-detected"
                       >
                         <CheckCircle weight="fill" className="h-5 w-5" />
-                        {t("form.detected")}: {operator.name}
+                        {detectedLine(operator)}
                       </motion.div>
                     ) : phone.length > 0 ? (
                       <div className={cn("text-xs", L ? "text-slate-500" : "text-black/40")}>{t("form.detected")}…</div>
@@ -525,6 +532,7 @@ export function RechargeForm({
                           : undefined
                       }
                     >
+                      {L ? "💰 " : null}
                       <Wallet weight="duotone" className="h-4 w-4" /> {t("form.airtime")}
                     </TabsTrigger>
                     <TabsTrigger
@@ -537,12 +545,13 @@ export function RechargeForm({
                           : undefined
                       }
                     >
+                      {L ? "📱 " : null}
                       <Lightning weight="duotone" className="h-4 w-4" /> {t("form.data")}
                     </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="airtime" className="mt-5">
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-3">
+                    <div className={cn("grid gap-2", L ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6" : "grid-cols-3 sm:grid-cols-3")}>
                       {QUICK_AMOUNTS.map((a) => (
                         <button
                           key={a}
@@ -703,28 +712,34 @@ export function RechargeForm({
                       L ? "border-white/10 bg-white/5" : "border-black/5 bg-brand-bg",
                     )}
                   >
-                    <div className={cn("text-[11px] font-semibold uppercase tracking-[0.18em]", L ? "text-slate-400" : "text-black/50")}>Summary</div>
+                    <div className={cn("text-[11px] font-semibold uppercase tracking-[0.18em]", L ? "text-slate-400" : "text-black/50")}>
+                      {t("form.summary_title")}
+                    </div>
                     <div className="mt-2 grid gap-1 text-sm">
                       <div className="flex justify-between">
-                        <span className={L ? "text-slate-400" : "text-black/60"}>Operator</span>
+                        <span className={L ? "text-slate-400" : "text-black/60"}>{t("form.summary_operator")}</span>
                         <span className="font-semibold">
                           {operator.flag} {operator.name}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className={L ? "text-slate-400" : "text-black/60"}>Recipient</span>
+                        <span className={L ? "text-slate-400" : "text-black/60"}>{t("form.summary_phone")}</span>
                         <span className="font-mono font-semibold">
                           {country.dial} {phone}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className={L ? "text-slate-400" : "text-black/60"}>Type</span>
+                        <span className={L ? "text-slate-400" : "text-black/60"}>{t("form.summary_type")}</span>
                         <span className="font-semibold uppercase tracking-wide">
                           {type === "airtime" ? t("form.airtime") : t("form.data") + (plan ? ` · ${DATA_PLANS.find((p) => p.id === plan)?.name}` : "")}
                         </span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className={L ? "text-slate-400" : "text-black/60"}>{t("form.summary_delay")}</span>
+                        <span className="font-semibold text-[#00D084]">{t("form.summary_instant")}</span>
+                      </div>
                       <div className={cn("mt-2 flex items-end justify-between border-t pt-2", L ? "border-white/10" : "border-black/5")}>
-                        <span className={L ? "text-slate-400" : "text-black/60"}>Total</span>
+                        <span className={L ? "text-slate-400" : "text-black/60"}>{t("form.summary_total")}</span>
                         <span className={cn("text-2xl font-extrabold tracking-tight", L ? "font-landing-stat text-white" : "font-display")}>
                           {formatCurrency(finalAmount)}
                         </span>
@@ -748,6 +763,7 @@ export function RechargeForm({
                       )}
                     >
                       <div className="flex items-center gap-2 text-sm font-semibold">
+                        {L ? <span aria-hidden>💳</span> : null}
                         <CreditCard className="h-4 w-4" /> {t("form.pay_card")}
                       </div>
                       <div className={cn("text-[10px] uppercase tracking-[0.18em]", L ? "text-slate-500" : "text-black/40")}>Stripe · Visa · Mastercard</div>
@@ -794,6 +810,7 @@ export function RechargeForm({
                         )}
                       >
                         <div className="flex items-center gap-2 text-sm font-semibold">
+                          {L ? <span aria-hidden>💚</span> : null}
                           <Wallet className="h-4 w-4" /> {t("form.pay_moncash")}
                         </div>
                         <div className={cn("text-[10px] uppercase tracking-[0.18em]", L ? "text-slate-500" : "text-black/40")}>Mobile money</div>

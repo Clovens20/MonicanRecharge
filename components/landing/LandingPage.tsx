@@ -34,6 +34,42 @@ const OPERATOR_LOGOS = [
   { name: "Movistar", src: "/operators/movistar.svg" },
 ];
 
+/** Bandeau section Couverture — marques demandées (affichage landing uniquement). */
+const COVERAGE_STRIP_LOGOS = [
+  { name: "Digicel", src: "/operators/digicel.svg" },
+  { name: "Natcom", src: "/operators/natcom.svg" },
+  { name: "AT&T", src: "/operators/att.svg" },
+  { name: "T-Mobile", src: "/operators/tmobile.svg" },
+  { name: "Verizon", src: "/operators/verizon.svg" },
+  { name: "Rogers", src: "/operators/rogers.svg" },
+  { name: "Bell", src: "/operators/bell.svg" },
+  { name: "Orange", src: "/operators/orange.svg" },
+  { name: "SFR", src: "/operators/sfr.svg" },
+  { name: "Claro", src: "/operators/claro.svg" },
+  { name: "Tigo", src: "/operators/tigo.svg" },
+];
+
+/** Avis : photos de client·e·s noirs·es ; textes en kreyòl ; carte 3 = espagnol + même idée en kreyòl. */
+const LANDING_TESTIMONIALS = [
+  {
+    img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=160&h=160&fit=crop&crop=faces&q=75",
+    quoteKr:
+      "Depi Miami mwen voye Digicel pou manman m chak semèn — Monican fè l vit, epi li resevwa l an kèk segond. Mèsi anpil!",
+  },
+  {
+    img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=160&h=160&fit=crop&crop=faces&q=75",
+    quoteKr:
+      "Sèvis la klè, peman an san pwoblèm, livrezon an instantane. Se pi bon fason pou m rete konekte ak fanmi mwen an Ayiti. Mwen rekòmande l!",
+  },
+  {
+    img: "https://images.unsplash.com/photo-1589156280159-27698b77008e?w=160&h=160&fit=crop&crop=faces&q=75",
+    quoteEs:
+      "Con Monican envío recarga a mi familia en Haití desde Santo Domingo — rápido, fácil y sin complicaciones.",
+    quoteKr:
+      "Ak Monican mwen voye recharge pou fanmi mwen an Ayiti depi Santo Domingo — rapid, fasil, san tet anba.",
+  },
+] as const;
+
 const AVATARS = [
   "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=96&h=96&fit=crop",
   "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop",
@@ -42,15 +78,29 @@ const AVATARS = [
   "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=96&h=96&fit=crop",
 ];
 
-const STORY_IMG =
-  "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=900&h=1100&fit=crop&q=80";
-const FAMILY_MOMENTS = [
-  "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=700&h=480&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=700&h=480&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1511485977113-f34c92461ad9?w=700&h=480&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=700&h=480&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=700&h=480&fit=crop&q=80",
-];
+const STORY_IMG = "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=720&h=900&fit=crop&q=75";
+const FAMILY_STRIP = [
+  {
+    src: "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=480&h=320&fit=crop&q=75",
+    caption: "Fanmi nan Miami · Recharge Digicel voye ✅",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=480&h=320&fit=crop&q=75",
+    caption: "Diaspora Kanada · Natcom konekte 📱",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1511485977113-f34c92461ad9?w=480&h=320&fit=crop&q=75",
+    caption: "Depi Paris · Voye an 8 segond ⚡",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=480&h=320&fit=crop&q=75",
+    caption: "Kliyan Monican · 3,000+ satisfè ⭐",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=480&h=320&fit=crop&q=75",
+    caption: "Recharge instantane · 150+ peyi 🌍",
+  },
+] as const;
 
 function useAnimatedNumber(target: number, enabled: boolean, durationMs = 1600) {
   const [n, setN] = useState(0);
@@ -227,7 +277,16 @@ export function LandingPage() {
                     className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#0A0E1A] ring-2 ring-[#00D084]/30"
                     style={{ zIndex: AVATARS.length - i }}
                   >
-                    <Image src={src} alt="" width={44} height={44} className="object-cover" sizes="44px" />
+                    <Image
+                      src={src}
+                      alt=""
+                      width={44}
+                      height={44}
+                      className="object-cover"
+                      sizes="44px"
+                      priority={i === 0}
+                      loading={i === 0 ? "eager" : "lazy"}
+                    />
                   </div>
                 ))}
               </div>
@@ -347,11 +406,23 @@ export function LandingPage() {
               animate={{ x: ["0%", "-50%"] }}
               transition={{ duration: 24, ease: "linear", repeat: Infinity }}
             >
-              {[...FAMILY_MOMENTS, ...FAMILY_MOMENTS].map((src, idx) => (
-                <div key={`${src}-${idx}`} className="relative h-32 min-w-[220px] overflow-hidden rounded-2xl sm:h-40 sm:min-w-[280px]">
-                  <Image src={src} alt="" fill className="object-cover" sizes="280px" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                  <div className="absolute bottom-2 left-3 text-xs font-semibold text-white/90">Famille satisfaite · Recharge livree</div>
+              {[...FAMILY_STRIP, ...FAMILY_STRIP].map((item, idx) => (
+                <div
+                  key={`${item.src}-${idx}`}
+                  className="relative h-32 min-w-[220px] overflow-hidden rounded-2xl sm:h-40 sm:min-w-[260px]"
+                >
+                  <Image
+                    src={item.src}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="(max-width:640px) 220px, 260px"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                  <div className="absolute bottom-2 left-2 right-2 text-[11px] font-semibold leading-snug text-white sm:text-xs">
+                    {item.caption}
+                  </div>
                 </div>
               ))}
             </motion.div>
@@ -371,7 +442,7 @@ export function LandingPage() {
 
       {/* ——— MAIN FORM ——— */}
       <section id="recharge-main" className="scroll-mt-24 bg-gradient-to-b from-[#0F172A] to-[#0A0E1A] py-20 sm:py-28">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -385,55 +456,15 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ——— STORY ——— */}
-      <section className="py-20 sm:py-28">
-        <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, scale: 1.03 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="relative aspect-[4/5] max-h-[560px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#1A0A2E] to-[#0D1B2A]"
-          >
-            <Image src={STORY_IMG} alt="" fill className="object-cover" sizes="(max-width: 1024px) 100vw, 50vw" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0E1A] via-transparent to-transparent" />
-            <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white backdrop-blur-md">
-              {t("landing.story_badge")}
-            </div>
-          </motion.div>
-          <div>
-            <span className="text-sm font-bold uppercase tracking-wider text-[#7C3AED]">{t("landing.story_tag")}</span>
-            <h2 className="font-landing-display mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{t("landing.story_h2")}</h2>
-            <p className="mt-4 text-lg leading-relaxed text-slate-400">{t("landing.story_p")}</p>
-            <ul className="mt-8 space-y-3 text-slate-300">
-              {(["landing.story_feat1", "landing.story_feat2", "landing.story_feat3", "landing.story_feat4", "landing.story_feat5"] as const).map(
-                (k) => (
-                  <li key={k} className="flex gap-2">
-                    <span className="text-[#00D084]">✅</span>
-                    <span>{t(k)}</span>
-                  </li>
-                ),
-              )}
-            </ul>
-            <button
-              type="button"
-              onClick={scrollToForm}
-              className="mt-10 inline-flex rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:border-[#00D084] hover:bg-white/5"
-            >
-              {t("landing.story_btn")}
-            </button>
-          </div>
-        </div>
-      </section>
-
       {/* ——— HOW ——— */}
       <section id="how-it-works" className="scroll-mt-24 border-t border-white/5 bg-[#0A0E1A] py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="font-landing-display text-center text-3xl font-extrabold text-white sm:text-4xl">{t("landing.how_title")}</h2>
           <div className="mt-14 grid gap-6 md:grid-cols-3">
             {[
-              { n: "01", icon: "📱", glow: "shadow-[0_0_40px_rgba(0,208,132,0.25)]", title: t("how.s1.title"), body: t("how.s1.desc") },
-              { n: "02", icon: "💰", glow: "shadow-[0_0_40px_rgba(245,158,11,0.2)]", title: t("how.s2.title"), body: t("how.s2.desc") },
-              { n: "03", icon: "⚡", glow: "shadow-[0_0_40px_rgba(0,208,132,0.3)]", title: t("how.s3.title"), body: t("how.s3.desc") },
+              { n: "1", icon: "📱", glow: "shadow-[0_0_40px_rgba(0,208,132,0.25)]", title: t("how.s1.title"), body: t("how.s1.desc") },
+              { n: "2", icon: "💰", glow: "shadow-[0_0_40px_rgba(245,158,11,0.2)]", title: t("how.s2.title"), body: t("how.s2.desc") },
+              { n: "3", icon: "⚡", glow: "shadow-[0_0_40px_rgba(0,208,132,0.3)]", title: t("how.s3.title"), body: t("how.s3.desc") },
             ].map((c, i) => (
               <motion.div
                 key={c.n}
@@ -463,8 +494,11 @@ export function LandingPage() {
           <div className="text-center">
             <h2 className="font-landing-display text-3xl font-extrabold text-white sm:text-4xl">{t("landing.map_title")}</h2>
             <p className="mt-3 text-slate-400">{t("landing.map_sub")}</p>
+            <p className="mt-6 text-2xl tracking-wide text-slate-300" aria-label="Featured countries">
+              🇭🇹 🇺🇸 🇨🇦 🇫🇷 🇩🇴 🇧🇷
+            </p>
           </div>
-          <div className="relative mt-14 flex h-64 items-center justify-center rounded-3xl border border-white/10 bg-[#0A0E1A]/80 bg-[radial-gradient(ellipse_at_center,rgba(0,208,132,0.12),transparent_70%)] sm:h-80">
+          <div className="relative mt-10 flex h-64 items-center justify-center rounded-3xl border border-white/10 bg-[#0A0E1A]/80 bg-[radial-gradient(ellipse_at_center,rgba(0,208,132,0.12),transparent_70%)] sm:h-80">
             <svg viewBox="0 0 800 320" className="h-full w-full max-w-4xl opacity-40" aria-hidden>
               <path
                 fill="none"
@@ -477,23 +511,23 @@ export function LandingPage() {
               <circle cx="180" cy="140" r="4" className="fill-violet-400" />
               <circle cx="620" cy="130" r="4" className="fill-violet-400" />
             </svg>
-            <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-slate-400 sm:gap-8">
-              <span>🇭🇹 Haïti</span>
+            <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-5 text-xs font-semibold text-slate-400 sm:gap-6">
+              <span>🇭🇹 Haiti</span>
+              <span>🇺🇸 USA</span>
+              <span>🇨🇦 Canada</span>
               <span>🇫🇷 France</span>
-              <span>🇬🇧 UK</span>
-              <span>🇳🇬 Nigeria</span>
-              <span>🇲🇽 Mexique</span>
-              <span>🇪🇸 Espagne</span>
+              <span>🇩🇴 RD</span>
+              <span>🇧🇷 Brazil</span>
             </div>
           </div>
-          <div className="mt-10 flex flex-wrap justify-center gap-3">
-            {OPERATOR_LOGOS.map((op) => (
+          <div className="mt-10 flex flex-wrap justify-center gap-2 sm:gap-3">
+            {COVERAGE_STRIP_LOGOS.map((op) => (
               <div
-                key={op.name}
-                className="flex h-14 items-center justify-center rounded-full border border-white/15 bg-gradient-to-b from-white/[0.08] to-white/[0.02] px-4 shadow-lg shadow-black/20 ring-1 ring-white/5 transition hover:border-emerald-400/30 hover:from-white/[0.12] hover:ring-emerald-400/20"
+                key={`${op.name}-${op.src}`}
+                className="flex h-12 items-center justify-center rounded-full border border-white/15 bg-gradient-to-b from-white/[0.08] to-white/[0.02] px-3 shadow-md shadow-black/20 ring-1 ring-white/5 transition hover:border-emerald-400/30 sm:h-14 sm:px-4"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={op.src} alt={op.name} className="h-7 w-auto max-w-[112px] object-contain drop-shadow-sm" />
+                <img src={op.src} alt="" className="h-6 w-auto max-w-[88px] object-contain opacity-95 sm:h-7 sm:max-w-[100px]" loading="lazy" />
               </div>
             ))}
           </div>
@@ -539,51 +573,52 @@ export function LandingPage() {
             </div>
           </div>
           <div className="mt-14 grid gap-6 md:grid-cols-3">
-            {[
-              {
-                img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop",
-                q: "landing.testi_q1",
-                n: "landing.testi_n1",
-                l: "landing.testi_l1",
-                d: "landing.testi_d1",
-              },
-              {
-                img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&h=200&fit=crop",
-                q: "landing.testi_q2",
-                n: "landing.testi_n2",
-                l: "landing.testi_l2",
-                d: "landing.testi_d2",
-              },
-              {
-                img: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&h=200&fit=crop",
-                q: "landing.testi_q3",
-                n: "landing.testi_n3",
-                l: "landing.testi_l3",
-                d: "landing.testi_d3",
-              },
-            ].map((card, i) => (
+            {(
+              [
+                { n: "landing.testi_n1", l: "landing.testi_l1", d: "landing.testi_d1" },
+                { n: "landing.testi_n2", l: "landing.testi_l2", d: "landing.testi_d2" },
+                { n: "landing.testi_n3", l: "landing.testi_l3", d: "landing.testi_d3" },
+              ] as const
+            ).map((meta, i) => {
+              const card = LANDING_TESTIMONIALS[i]!;
+              return (
               <motion.div
-                key={card.n}
+                key={meta.n}
                 initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.12 }}
-                className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition hover:-translate-y-1 hover:shadow-xl"
+                className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-lg shadow-black/20 backdrop-blur-xl transition hover:-translate-y-1 hover:border-white/15 hover:shadow-xl"
               >
-                <div className="relative h-14 w-14 overflow-hidden rounded-full">
-                  <Image src={card.img} alt="" width={56} height={56} className="object-cover" />
+                <div className="relative h-14 w-14 overflow-hidden rounded-full ring-2 ring-[#00D084]/25">
+                  <Image src={card.img} alt="" width={56} height={56} className="object-cover" loading="lazy" />
                 </div>
                 <div className="mt-3 flex text-amber-400">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star key={s} weight="fill" className="h-4 w-4" />
                   ))}
                 </div>
-                <p className="mt-4 text-sm leading-relaxed text-slate-300">&ldquo;{t(card.q)}&rdquo;</p>
-                <div className="mt-4 text-sm font-bold text-white">{t(card.n)}</div>
-                <div className="text-xs text-slate-500">{t(card.l)}</div>
-                <div className="mt-1 text-xs text-slate-600">{t(card.d)}</div>
+                {"quoteEs" in card && card.quoteEs ? (
+                  <>
+                    <p className="mt-4 text-sm leading-relaxed text-slate-200" lang="es">
+                      &ldquo;{card.quoteEs}&rdquo;
+                    </p>
+                    <p className="mt-3 text-sm leading-relaxed text-slate-300/95" lang="ht">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-[#00D084]/90">Kreyòl · </span>
+                      &ldquo;{card.quoteKr}&rdquo;
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-4 text-sm leading-relaxed text-slate-200" lang="ht">
+                    &ldquo;{card.quoteKr}&rdquo;
+                  </p>
+                )}
+                <div className="mt-4 text-sm font-bold text-white">{t(meta.n)}</div>
+                <div className="text-xs text-slate-500">{t(meta.l)}</div>
+                <div className="mt-1 text-xs text-slate-600">{t(meta.d)}</div>
               </motion.div>
-            ))}
+            );
+            })}
           </div>
         </div>
       </section>
@@ -642,6 +677,40 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* ——— FINAL CTA ——— */}
+      <section className="relative overflow-hidden py-24">
+        <div className="landing-hero-gradient absolute inset-0 opacity-90" />
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#00D084]/12 blur-[100px]" />
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#7C3AED]/20 blur-[120px]" />
+        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <h2 className="font-landing-display text-4xl font-extrabold text-white sm:text-5xl">
+            {t("landing.final_h2")}
+            {t("landing.final_grad").trim() ? (
+              <>
+                {" "}
+                <span className="landing-gradient-accent">{t("landing.final_grad")}</span>
+              </>
+            ) : null}
+          </h2>
+          <p className="mt-6 text-lg text-slate-400">{t("landing.final_sub")}</p>
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link
+              href="/enskri"
+              className="landing-cta-gradient inline-flex items-center justify-center rounded-full px-10 py-4 text-base font-bold text-white shadow-[0_12px_40px_rgba(0,208,132,0.35)] transition hover:brightness-110"
+            >
+              {t("landing.final_cta1")}
+            </Link>
+            <Link
+              href="#how-it-works"
+              className="inline-flex rounded-full border border-white/20 px-8 py-4 text-sm font-semibold text-white hover:bg-white/5"
+            >
+              {t("landing.final_cta2")}
+            </Link>
+          </div>
+          <p className="mt-10 text-xs text-slate-500">{t("landing.trust_row")}</p>
+        </div>
+      </section>
+
       {/* ——— PWA ——— */}
       <section className="bg-[#111827] py-20 sm:py-28">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
@@ -673,31 +742,50 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ——— FINAL CTA ——— */}
-      <section className="relative overflow-hidden py-24">
-        <div className="landing-hero-gradient absolute inset-0 opacity-90" />
-        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#7C3AED]/25 blur-[120px]" />
-        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <h2 className="font-landing-display text-4xl font-extrabold text-white sm:text-5xl">
-            {t("landing.final_h2")}{" "}
-            <span className="landing-gradient-accent">{t("landing.final_grad")}</span>
-          </h2>
-          <p className="mt-6 text-lg text-slate-400">{t("landing.final_sub")}</p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="/enskri"
-              className="landing-cta-gradient inline-flex items-center justify-center rounded-full px-10 py-4 text-base font-bold text-white shadow-[0_12px_40px_rgba(0,208,132,0.35)] transition hover:brightness-110"
+      {/* ——— STORY ——— */}
+      <section className="border-t border-white/5 py-20 sm:py-28">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, scale: 1.03 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="relative aspect-[4/5] max-h-[520px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#1A0A2E] to-[#0D1B2A]"
+          >
+            <Image
+              src={STORY_IMG}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="(max-width: 1024px) 100vw, 45vw"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0E1A] via-transparent to-transparent" />
+            <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white backdrop-blur-md">
+              {t("landing.story_badge")}
+            </div>
+          </motion.div>
+          <div>
+            <span className="text-sm font-bold uppercase tracking-wider text-[#7C3AED]">{t("landing.story_tag")}</span>
+            <h2 className="font-landing-display mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{t("landing.story_h2")}</h2>
+            <p className="mt-4 text-lg leading-relaxed text-slate-400">{t("landing.story_p")}</p>
+            <ul className="mt-8 space-y-3 text-slate-300">
+              {(["landing.story_feat1", "landing.story_feat2", "landing.story_feat3", "landing.story_feat4", "landing.story_feat5"] as const).map(
+                (k) => (
+                  <li key={k} className="flex gap-2">
+                    <span className="text-[#00D084]">✅</span>
+                    <span>{t(k)}</span>
+                  </li>
+                ),
+              )}
+            </ul>
+            <button
+              type="button"
+              onClick={scrollToForm}
+              className="mt-10 inline-flex rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:border-[#00D084] hover:bg-white/5"
             >
-              {t("landing.final_cta1")}
-            </Link>
-            <Link
-              href="#how-it-works"
-              className="inline-flex rounded-full border border-white/20 px-8 py-4 text-sm font-semibold text-white hover:bg-white/5"
-            >
-              {t("landing.final_cta2")}
-            </Link>
+              {t("landing.story_btn")}
+            </button>
           </div>
-          <p className="mt-10 text-xs text-slate-500">{t("landing.trust_row")}</p>
         </div>
       </section>
 

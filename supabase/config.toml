@@ -1,0 +1,25 @@
+# https://supabase.com/docs/guides/cli/config
+
+[functions.reloadly-webhook]
+verify_jwt = false
+
+[functions.reloadly-token]
+verify_jwt = false
+
+[functions.detekte-operate]
+verify_jwt = true
+
+[functions.jwenn-forfe-done]
+verify_jwt = true
+
+[functions.voye-recharge]
+verify_jwt = false
+
+[functions.kreye-checkout]
+verify_jwt = true
+
+[functions.verifye-stripe]
+verify_jwt = false
+
+[functions.verifye-balans]
+verify_jwt = false

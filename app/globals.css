@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800,900&f[]=manrope@300,400,500,600,700&display=swap");
-
 :root {
   --brand-ink: #111827;
   --brand-green: #10B981;
@@ -19,12 +17,12 @@
 html, body {
   background: var(--brand-bg);
   color: var(--brand-ink);
-  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 ::selection { background: rgba(16, 185, 129, 0.25); color: #064E3B; }
 
-.font-display { font-family: "Cabinet Grotesk", "Manrope", ui-sans-serif, system-ui, sans-serif; }
+.font-display { font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif; }
 
 .glass {
   background: rgba(255, 255, 255, 0.7);

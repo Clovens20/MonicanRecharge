@@ -34,10 +34,10 @@ const config: Config = {
         danger: "#EF4444",
       },
       fontFamily: {
-        display: ["'Cabinet Grotesk'", "'Manrope'", "ui-sans-serif", "system-ui"],
-        body: ["'Manrope'", "ui-sans-serif", "system-ui"],
-        landing: ["var(--font-inter)", "Manrope", "ui-sans-serif", "system-ui"],
-        "landing-display": ["var(--font-jakarta)", "Cabinet Grotesk", "ui-sans-serif", "system-ui"],
+        display: ["var(--font-jakarta)", "ui-sans-serif", "system-ui"],
+        body: ["var(--font-inter)", "ui-sans-serif", "system-ui"],
+        landing: ["var(--font-inter)", "ui-sans-serif", "system-ui"],
+        "landing-display": ["var(--font-jakarta)", "ui-sans-serif", "system-ui"],
         "landing-stat": ["var(--font-space)", "ui-sans-serif", "system-ui"],
       },
       letterSpacing: {

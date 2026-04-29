@@ -31,11 +31,13 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://monican-recharge.vercel.app";
+
 export const metadata: Metadata = {
   title: "Monican Recharge — Voye Recharge Rapid, Fasil, Kote ou Ye",
   description:
     "Send instant phone credit & data plans to Haiti (Digicel, Natcom) and 150+ countries. Trusted, fast, secure.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  metadataBase: new URL(siteUrl),
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -50,6 +52,13 @@ export const metadata: Metadata = {
     title: "Monican Recharge",
     description: "Voye Recharge — Rapid, Fasil, Kote ou Ye",
     type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Monican Recharge" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Monican Recharge",
+    description: "Voye Recharge — Rapid, Fasil",
+    images: [`${siteUrl.replace(/\/$/, "")}/og-image.png`],
   },
   other: {
     "mobile-web-app-capable": "yes",
@@ -58,8 +67,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${plusJakarta.variable} ${spaceGrotesk.variable}`}>
+    <html lang="ht">
+      <body className={`${inter.className} ${inter.variable} ${plusJakarta.variable} ${spaceGrotesk.variable}`}>
         <LanguageProvider>
           <Suspense fallback={null}>
             <RefSync />

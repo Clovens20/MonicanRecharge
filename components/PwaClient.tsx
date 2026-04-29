@@ -4,20 +4,35 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useLang } from "@/lib/i18n/LanguageProvider";
 
-const VISITS = "monican_visit_count";
+const VISITED_KEY = "visited_count";
+const LEGACY_VISITS = "monican_visit_count";
 const DISMISSED = "monican_pwa_dismissed";
 
 type BeforeInstallPromptLike = Event & { prompt: () => Promise<{ outcome?: string }> };
+
+function readVisitCount(): number {
+  try {
+    const v = localStorage.getItem(VISITED_KEY);
+    if (v != null) return parseInt(v, 10) || 0;
+    const legacy = localStorage.getItem(LEGACY_VISITS);
+    if (legacy != null) {
+      const n = parseInt(legacy, 10) || 0;
+      localStorage.setItem(VISITED_KEY, String(n));
+      return n;
+    }
+  } catch {}
+  return 0;
+}
 
 function PwaClient() {
   const { t } = useLang();
   const [deferred, setDeferred] = useState<BeforeInstallPromptLike | null>(null);
   const [show, setShow] = useState(false);
+  const [visitOk, setVisitOk] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
     if (process.env.NODE_ENV !== "production") {
-      // Evite les chunks obsolètes en dev: désenregistre tous les SW.
       navigator.serviceWorker.getRegistrations().then((regs) => {
         regs.forEach((r) => r.unregister().catch(() => {}));
       });
@@ -33,14 +48,23 @@ function PwaClient() {
     window.addEventListener("beforeinstallprompt", onBip);
 
     try {
-      const n = parseInt(localStorage.getItem(VISITS) || "0", 10) + 1;
-      localStorage.setItem(VISITS, String(n));
-      const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const prev = readVisitCount();
+      const n = prev + 1;
+      localStorage.setItem(VISITED_KEY, String(n));
+      const ok = n >= 2;
+      setVisitOk(ok);
       const dismissed = localStorage.getItem(DISMISSED) === "1";
-      if (mobile && n >= 2 && !dismissed) setShow(true);
-    } catch {}
+      if (ok && !dismissed) setShow(true);
+    } catch {
+      setVisitOk(false);
+    }
 
-    const openFromLanding = () => setShow(true);
+    const openFromLanding = () => {
+      try {
+        const n = parseInt(localStorage.getItem(VISITED_KEY) || "0", 10);
+        if (n >= 2) setShow(true);
+      } catch {}
+    };
     window.addEventListener("monican-open-pwa-banner", openFromLanding);
 
     return () => {
@@ -59,6 +83,7 @@ function PwaClient() {
     setShow(false);
   }
 
+  if (!visitOk) return null;
   if (!show && !deferred) return null;
 
   return (
