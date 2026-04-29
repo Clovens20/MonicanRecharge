@@ -27,11 +27,11 @@ const RechargeForm = dynamic(
 const OPERATOR_LOGOS = [
   { name: "Digicel", src: "/operators/digicel.svg" },
   { name: "Natcom", src: "/operators/natcom.svg" },
-  { name: "AT&T", src: "/operators/att.svg" },
-  { name: "T-Mobile", src: "/operators/tmobile.svg" },
-  { name: "Verizon", src: "/operators/verizon.svg" },
-  { name: "Rogers", src: "/operators/rogers.svg" },
-  { name: "Bell", src: "/operators/bell.svg" },
+  { name: "Orange", src: "/operators/orange.svg" },
+  { name: "Vodafone", src: "/operators/vodafone.svg" },
+  { name: "MTN", src: "/operators/mtn.svg" },
+  { name: "Claro", src: "/operators/claro.svg" },
+  { name: "Movistar", src: "/operators/movistar.svg" },
 ];
 
 const AVATARS = [
@@ -477,31 +477,34 @@ export function LandingPage() {
               <circle cx="180" cy="140" r="4" className="fill-violet-400" />
               <circle cx="620" cy="130" r="4" className="fill-violet-400" />
             </svg>
-            <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-8 text-xs font-semibold text-slate-400">
-              <span>🇭🇹 Haiti</span>
-              <span>🇺🇸 USA</span>
-              <span>🇨🇦 Canada</span>
+            <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-slate-400 sm:gap-8">
+              <span>🇭🇹 Haïti</span>
               <span>🇫🇷 France</span>
-              <span>🇩🇴 DR</span>
+              <span>🇬🇧 UK</span>
+              <span>🇳🇬 Nigeria</span>
+              <span>🇲🇽 Mexique</span>
+              <span>🇪🇸 Espagne</span>
             </div>
           </div>
-          <div className="mt-10 flex flex-wrap justify-center gap-2">
+          <div className="mt-10 flex flex-wrap justify-center gap-3">
             {OPERATOR_LOGOS.map((op) => (
               <div
                 key={op.name}
-                className="flex h-14 items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 grayscale transition hover:grayscale-0"
+                className="flex h-14 items-center justify-center rounded-full border border-white/15 bg-gradient-to-b from-white/[0.08] to-white/[0.02] px-4 shadow-lg shadow-black/20 ring-1 ring-white/5 transition hover:border-emerald-400/30 hover:from-white/[0.12] hover:ring-emerald-400/20"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={op.src} alt={op.name} className="h-7 w-auto max-w-[100px] object-contain opacity-90" />
+                <img src={op.src} alt={op.name} className="h-7 w-auto max-w-[112px] object-contain drop-shadow-sm" />
               </div>
             ))}
           </div>
           <div className="mx-auto mt-10 grid max-w-3xl gap-3 text-sm sm:grid-cols-2">
             {[
-              "🇭🇹 Haiti — Digicel, Natcom",
-              "🇺🇸 USA — AT&T, T-Mobile, Verizon, +30",
-              "🇨🇦 Canada — Rogers, Bell, Telus, +10",
-              "🇫🇷 France — Orange, SFR, Bouygues, +5",
+              "🇭🇹 Haïti — Digicel, Natcom",
+              "🇫🇷 France — Orange, SFR, Bouygues, Free",
+              "🇬🇧 Royaume-Uni — Vodafone, EE, O2, Three",
+              "🇳🇬 Nigeria — MTN, Airtel, Glo, 9mobile",
+              "🇲🇽 Mexique — Telcel, Movistar, Virgin, +10",
+              "🇪🇸 Espagne — Movistar, Orange, Vodafone",
             ].map((row) => (
               <div key={row} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-slate-300">
                 {row}
