@@ -85,6 +85,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "operatorId, operatorName, recipientPhone et amount requis" }, { status: 400 });
   }
 
+  const operatorIdNum = Number(operatorId);
+  if (!Number.isFinite(operatorIdNum) || operatorIdNum <= 0) {
+    return NextResponse.json({ error: "operatorId invalide" }, { status: 400 });
+  }
+
   const prixKoutaj = Number(amount);
   if (!Number.isFinite(prixKoutaj) || prixKoutaj <= 0) {
     return NextResponse.json({ error: "amount invalide" }, { status: 400 });
@@ -97,6 +102,7 @@ export async function POST(req: Request) {
     .from("tranzaksyon")
     .insert({
       user_id: user.id,
+      operator_id: operatorIdNum,
       operatè: String(operatorName),
       pays_kòd: String(countryCode).toUpperCase().slice(0, 2),
       nimewo_resevwa: String(recipientPhone),

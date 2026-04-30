@@ -69,6 +69,7 @@ export async function sendCashRechargeViaReloadly(params: {
     .from("tranzaksyon")
     .insert({
       user_id: userId,
+      operator_id: op.operator_id,
       operatè: op.operator,
       pays_kòd: cc,
       nimewo_resevwa: num,

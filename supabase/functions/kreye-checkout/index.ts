@@ -61,6 +61,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "operatorId, operatorName, recipientPhone et amount requis" }, 400);
     }
 
+    const operatorIdNum = Number(operatorId);
+    if (!Number.isFinite(operatorIdNum) || operatorIdNum <= 0) {
+      return jsonResponse({ error: "operatorId invalide" }, 400);
+    }
+
     const prixKoutaj = Number(amount);
     if (!Number.isFinite(prixKoutaj) || prixKoutaj <= 0) {
       return jsonResponse({ error: "amount invalide" }, 400);
@@ -75,6 +80,7 @@ Deno.serve(async (req) => {
       .from("tranzaksyon")
       .insert({
         user_id: userId,
+        operator_id: operatorIdNum,
         operatè: operatorName,
         pays_kòd: String(countryCode).toUpperCase().slice(0, 2),
         nimewo_resevwa: String(recipientPhone),
