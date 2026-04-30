@@ -26,8 +26,12 @@ export default function AuthKonpletePage() {
         router.replace("/konekte");
         return;
       }
+      const sp = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+      const nextRaw = sp.get("next");
+      const nextSafe =
+        nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") && !nextRaw.includes("://") ? nextRaw : null;
       if (isAdminEmailClient(email)) router.replace("/admin");
-      else router.replace("/tableau-de-bord");
+      else router.replace(nextSafe || "/tableau-de-bord");
     });
   }, [router]);
 

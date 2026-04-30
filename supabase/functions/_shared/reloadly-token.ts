@@ -23,10 +23,17 @@ export async function getReloadlyToken(): Promise<string> {
     return cachedToken.token;
   }
 
-  const clientId = Deno.env.get("RELOADLY_CLIENT_ID");
-  const clientSecret = Deno.env.get("RELOADLY_CLIENT_SECRET");
+  const clientId =
+    Deno.env.get("RELOADLY_CLIENT_ID")?.trim() || Deno.env.get("RELOADLY_API_CLIENT_ID")?.trim() || "";
+  const clientSecret =
+    Deno.env.get("RELOADLY_CLIENT_SECRET")?.trim() ||
+    Deno.env.get("RELOADLY_API_SECRET")?.trim() ||
+    Deno.env.get("RELOADLY_API_KEY")?.trim() ||
+    "";
   if (!clientId || !clientSecret) {
-    throw new Error("Missing RELOADLY_CLIENT_ID or RELOADLY_CLIENT_SECRET");
+    throw new Error(
+      "Missing RELOADLY_CLIENT_ID (or RELOADLY_API_CLIENT_ID) and RELOADLY_CLIENT_SECRET (or RELOADLY_API_SECRET / RELOADLY_API_KEY)",
+    );
   }
 
   const res = await fetch(AUTH_URL, {

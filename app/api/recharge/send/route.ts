@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { buildRechargeFromBody, persistRechargeAndCommission, type RechargeBody, type RechargeRecord } from "@/lib/recharge/executeSend";
+import { buildRechargeFromBody, type RechargeBody, type RechargeRecord } from "@/lib/recharge/executeSend";
+import { sendCashRechargeViaReloadly } from "@/lib/recharge/cashViaReloadly";
+import { applyAgentCommission } from "@/lib/ajan/commission";
 import { verifyKesyeSession, KESYE_SESSION_COOKIE_NAME } from "@/lib/kesye/session-cookie";
 import { notifyRechargeSuccess } from "@/lib/notify/resend-notifications";
 import { assertRechargeAllowed } from "@/lib/security/recharge-guards";
@@ -15,14 +17,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (body.paymentMethod === "moncash") {
+  /** Paiement carte : Stripe Checkout (edge `kreye-checkout`) → webhook → `voye-recharge`. Pas d’envoi Reloadly ici. */
+  if (body.paymentMethod !== "cash") {
     return NextResponse.json(
       {
         success: false,
-        error: "Moncash itilize /peye/moncash — swiv enstriksyon sou paj la.",
-        redirect: "moncash_flow",
+        error:
+          body.paymentMethod === "stripe"
+            ? "Peman kat: itilize bouton Stripe sou fòm la (pa voye dirèkman isit la)."
+            : "Selman peman kès (cash) otorize sou wout sa a.",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -65,14 +70,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: guard.error }, { status: guard.status });
   }
 
-  await persistRechargeAndCommission(record, built.finalAmount, ref, { delayMs: 600 });
-  await notifyRechargeSuccess(record);
+  const shipped = await sendCashRechargeViaReloadly({ body, built, record, userId });
+  if (!shipped.ok) {
+    return NextResponse.json({ success: false, error: shipped.error }, { status: shipped.status });
+  }
+
+  const okRecord = shipped.record;
+  const com = await applyAgentCommission({
+    refKod: ref,
+    tranzaksyonRef: okRecord.reference,
+    montantVannUsd: built.finalAmount,
+  });
+  if (!com.ok) console.warn("Commission agent:", com.error);
+
+  await notifyRechargeSuccess(okRecord);
   await runAfterSuccessfulRecharge({
     userId,
-    record,
+    record: okRecord,
     finalAmountUsd: built.finalAmount,
     context: "normal",
   });
 
-  return NextResponse.json({ success: true, ...record });
+  return NextResponse.json({ success: true, ...okRecord });
 }

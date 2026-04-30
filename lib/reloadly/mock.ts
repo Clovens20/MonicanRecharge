@@ -21,6 +21,8 @@ export type DataPlan = {
   validity: string;
   priceUsd: number;
   popular?: boolean;
+  /** ID bundle Reloadly (API data-bundles) — obligatwa pou voye forfait data an reyèl. */
+  reloadlyBundleId?: number;
 };
 
 export const OPERATORS: Operator[] = [

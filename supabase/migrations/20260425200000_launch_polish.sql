@@ -25,6 +25,8 @@ WHERE
 
 ALTER TABLE public.rechaj_otomatik ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "rechaj_otomatik_own_all" ON public.rechaj_otomatik;
+
 CREATE POLICY "rechaj_otomatik_own_all" ON public.rechaj_otomatik FOR ALL USING (auth.uid () = user_id)
 WITH
   CHECK (auth.uid () = user_id);
@@ -38,6 +40,8 @@ CREATE TABLE IF NOT EXISTS public.pwen_fidelite (
 
 ALTER TABLE public.pwen_fidelite ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "pwen_fidelite_own" ON public.pwen_fidelite;
+
 CREATE POLICY "pwen_fidelite_own" ON public.pwen_fidelite FOR ALL USING (auth.uid () = user_id)
 WITH
   CHECK (auth.uid () = user_id);
@@ -49,6 +53,9 @@ CREATE TABLE IF NOT EXISTS public.referal_kod (
 );
 
 ALTER TABLE public.referal_kod ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "referal_kod_own_read" ON public.referal_kod;
+DROP POLICY IF EXISTS "referal_kod_own_insert" ON public.referal_kod;
 
 CREATE POLICY "referal_kod_own_read" ON public.referal_kod FOR SELECT USING (auth.uid () = user_id);
 
@@ -62,6 +69,9 @@ CREATE TABLE IF NOT EXISTS public.referal_atribisyon (
 
 ALTER TABLE public.referal_atribisyon ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "referal_atribisyon_referee_read" ON public.referal_atribisyon;
+DROP POLICY IF EXISTS "referal_atribisyon_referee_insert" ON public.referal_atribisyon;
+
 CREATE POLICY "referal_atribisyon_referee_read" ON public.referal_atribisyon FOR SELECT USING (auth.uid () = referee_user_id);
 
 CREATE TABLE IF NOT EXISTS public.referal_kredi (
@@ -71,6 +81,8 @@ CREATE TABLE IF NOT EXISTS public.referal_kredi (
 );
 
 ALTER TABLE public.referal_kredi ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "referal_kredi_own" ON public.referal_kredi;
 
 CREATE POLICY "referal_kredi_own" ON public.referal_kredi FOR ALL USING (auth.uid () = user_id)
 WITH
@@ -82,6 +94,8 @@ CREATE TABLE IF NOT EXISTS public.referal_bonus_done (
 );
 
 ALTER TABLE public.referal_bonus_done ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "referal_bonus_done_own_read" ON public.referal_bonus_done;
 
 CREATE POLICY "referal_bonus_done_own_read" ON public.referal_bonus_done FOR SELECT USING (auth.uid () = referee_user_id);
 

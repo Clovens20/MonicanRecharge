@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLang } from "@/lib/i18n/LanguageProvider";
 import { getTx, TxLocal } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
+import { mergeRemoteAndLocalTx } from "@/lib/tx/mergeRemoteLocal";
 import { formatCurrency } from "@/lib/utils";
 import { MagnifyingGlass, DownloadSimple } from "@phosphor-icons/react";
 
@@ -19,7 +21,34 @@ export default function HistoryPage() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [query, setQuery] = useState("");
 
-  useEffect(() => setTx(getTx()), []);
+  const load = useCallback(async () => {
+    const local = getTx();
+    const sb = createClient();
+    if (!sb) {
+      setTx(local);
+      return;
+    }
+    const { data: u } = await sb.auth.getUser();
+    if (!u.user) {
+      setTx(local);
+      return;
+    }
+    const r = await fetch("/api/me/tranzaksyon", { credentials: "include" });
+    if (!r.ok) {
+      setTx(local);
+      return;
+    }
+    const j = (await r.json()) as { transactions?: TxLocal[] };
+    const remote = Array.isArray(j.transactions) ? j.transactions : [];
+    setTx(mergeRemoteAndLocalTx(remote, local));
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const onStorage = () => void load();
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [load]);
 
   const filtered = useMemo(() => {
     let list = tx;

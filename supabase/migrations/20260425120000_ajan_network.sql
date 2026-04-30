@@ -99,6 +99,11 @@ ALTER TABLE public.peman_komisyon ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.komisyon_tranzaksyon ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invitasyon_ajan ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "profils_own_read" ON public.profils;
+DROP POLICY IF EXISTS "profils_own_upsert" ON public.profils;
+DROP POLICY IF EXISTS "ajan_own_read" ON public.ajan;
+DROP POLICY IF EXISTS "komisyon_own_read" ON public.komisyon_tranzaksyon;
+
 CREATE POLICY "profils_own_read" ON public.profils FOR SELECT USING (auth.uid () = user_id);
 CREATE POLICY "profils_own_upsert" ON public.profils FOR ALL USING (auth.uid () = user_id);
 
@@ -119,6 +124,9 @@ CREATE TABLE IF NOT EXISTS public.demann_peman_ajan (
 CREATE INDEX IF NOT EXISTS demann_peman_ajan_ajan_idx ON public.demann_peman_ajan (ajan_id);
 
 ALTER TABLE public.demann_peman_ajan ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "demann_own_read" ON public.demann_peman_ajan;
+
 CREATE POLICY "demann_own_read" ON public.demann_peman_ajan FOR SELECT USING (auth.uid () = ajan_id);
 
 -- Aplikasyon : insertion côté API (service role).

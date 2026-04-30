@@ -20,6 +20,8 @@ CREATE INDEX IF NOT EXISTS peman_moncash_order_idx ON public.peman_moncash (orde
 
 ALTER TABLE public.peman_moncash ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "peman_moncash_own_read" ON public.peman_moncash;
+
 CREATE POLICY "peman_moncash_own_read" ON public.peman_moncash FOR SELECT USING (auth.uid () = user_id);
 
 CREATE TABLE IF NOT EXISTS public.admin_settings (

@@ -94,7 +94,7 @@ export default function AjanLandingPage() {
           </div>
           <div>
             <dt className="font-bold text-brand-ink">ZHONGJI / enprime resè?</dt>
-            <dd className="mt-1">Boutik fizik Monican ka itilize enprimant thermik ak window.print — gade paramèt caisse sou tablo prensipal la.</dd>
+            <dd className="mt-1">Boutik fizik Monican ka itilize enprimant thermik ak window.print — gade paramèt caisse sou paj /recharge apre koneksyon NIP kèsye a.</dd>
           </div>
         </dl>
         <div className="mt-10 text-center">

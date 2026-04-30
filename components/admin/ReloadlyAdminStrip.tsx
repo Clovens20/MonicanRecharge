@@ -9,6 +9,8 @@ import { formatCurrency } from "@/lib/utils";
 
 type D = {
   balance: number;
+  balanceSource?: "live" | "env";
+  liveError?: string | null;
   minAlert: number;
   low: boolean;
   lastRecharge: string | null;
@@ -30,9 +32,20 @@ export function ReloadlyAdminStrip() {
   }
 
   useEffect(() => {
-    load();
-    const id = setInterval(load, 60000);
-    return () => clearInterval(id);
+    const runSoon = () => void load();
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (typeof requestIdleCallback !== "undefined") {
+      idleId = requestIdleCallback(runSoon, { timeout: 1200 });
+    } else {
+      timeoutId = window.setTimeout(runSoon, 400);
+    }
+    const id = setInterval(load, 120000);
+    return () => {
+      clearInterval(id);
+      if (idleId !== undefined) cancelIdleCallback(idleId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
   }, []);
 
   async function saveMin() {
@@ -59,6 +72,19 @@ export function ReloadlyAdminStrip() {
     load();
   }
 
+  async function testReloadlyLive() {
+    const r = await fetch("/api/reloadly/live-check");
+    const j = await r.json();
+    if (!r.ok || !j.ok) {
+      return toast.error(j.error || "Reloadly live-check echwe");
+    }
+    toast.success(
+      `Reloadly OK (${j.environment}) — solde API: ${j.walletBalance} ${j.walletCurrency}`,
+      { duration: 6000 },
+    );
+    void load();
+  }
+
   if (!d) return null;
 
   return (
@@ -69,7 +95,21 @@ export function ReloadlyAdminStrip() {
     >
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 md:pl-56">
         <span className="font-semibold">Reloadly</span>
-        <span>{formatCurrency(d.balance)}</span>
+        <span className="inline-flex items-baseline gap-1.5">
+          <span>{formatCurrency(d.balance)}</span>
+          {d.balanceSource === "live" ? (
+            <span className="text-[10px] font-medium uppercase tracking-wide text-emerald-700" title="Solde Reloadly (GET /accounts/balance)">
+              API
+            </span>
+          ) : (
+            <span
+              className="text-[10px] font-medium uppercase tracking-wide text-amber-800/80"
+              title={d.liveError || "Définis RELOADLY_CLIENT_ID + RELOADLY_CLIENT_SECRET pour le solde automatique"}
+            >
+              .env
+            </span>
+          )}
+        </span>
         {d.low ? <span className="font-bold">⚠️ Balans ba — recharje!</span> : null}
         <span className="text-black/50">
           Dènyè recharge: {d.lastRecharge ? new Date(d.lastRecharge).toLocaleString() : "—"}
@@ -84,6 +124,9 @@ export function ReloadlyAdminStrip() {
         </div>
         <Button size="sm" variant="outline" className="h-8 text-xs" onClick={markRecharge}>
           Mwen fè recharge kounye a
+        </Button>
+        <Button size="sm" variant="green" className="h-8 text-xs" onClick={testReloadlyLive}>
+          Tès API Reloadly
         </Button>
         <Link href={d.reloadlyUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-800 underline">
           Recharje sou Reloadly →

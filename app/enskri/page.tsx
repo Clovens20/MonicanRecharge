@@ -109,7 +109,7 @@ export default function SignupPage() {
           </p>
           <div className="mt-8 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
             <ShieldCheck weight="fill" className="h-5 w-5 text-emerald-600" />
-            <p className="text-xs text-emerald-700">Sekirite premye klas — peman ak Stripe + Moncash</p>
+            <p className="text-xs text-emerald-700">Sekirite premye klas — peman ak kat (Stripe)</p>
           </div>
         </div>
 

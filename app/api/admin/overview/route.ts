@@ -4,6 +4,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { isRechargeAdmin } from "@/lib/ajan/admin";
 import { todayStats, activeCustomersApprox } from "@/lib/admin/mongo-stats";
 import { getReloadlyMinAlertUsd } from "@/lib/admin/reloadly-settings";
+import { getReloadlyBalanceUsdForAdmin } from "@/lib/reloadly/adminBalance";
 
 export async function GET() {
   const sb = createClient();
@@ -18,7 +19,7 @@ export async function GET() {
 
   const t = await todayStats();
   const customers = await activeCustomersApprox();
-  const reloadly = parseFloat(process.env.RELOADLY_BALANCE_USD || "0");
+  const { balanceUsd: reloadly, source: reloadlyBalanceSource } = await getReloadlyBalanceUsdForAdmin();
   const minAlert = await getReloadlyMinAlertUsd();
   const reloadlyLow = reloadly < minAlert;
 
@@ -45,6 +46,7 @@ export async function GET() {
     todayRev: t.rev,
     todayTx: t.count,
     reloadly,
+    reloadlyBalanceSource,
     reloadlyLow,
     reloadlyMinAlert: minAlert,
     customers,

@@ -125,10 +125,23 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
     [t, path, user, isAdmin, hasAgent, kesyeOk],
   );
 
+  /** Raccourci header : pas sur le tableau de bord client (lien « Administration » reste dans le menu). */
+  const showAdminHeaderShortcut = useMemo(() => {
+    const p = path.replace(/\/$/, "") || "/";
+    if (p === "/tableau-de-bord") return false;
+    return isAdmin;
+  }, [path, isAdmin]);
+
+  /** Client connecté : pas /admin ni /recharge (flux boutique garde la nav). */
   const clientCompactNav = useMemo(
     () => Boolean(user && !isAdmin && !path.startsWith("/admin") && !path.startsWith("/recharge")),
     [user, isAdmin, path],
   );
+
+  const onAgentHub = path.startsWith("/tableau-de-bord/ajan");
+
+  /** Client : pas de liens Accueil / Historique / etc. dans le header (accès via le tableau de bord). Sauf hub agent. */
+  const hideClientHeaderNav = clientCompactNav && !onAgentHub;
 
   async function logout() {
     const sb = createClient();
@@ -153,7 +166,9 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
           </div>
         </Link>
 
-        {clientCompactNav ? (
+        {hideClientHeaderNav ? (
+          <div className="hidden min-w-0 flex-1 md:block" aria-hidden />
+        ) : clientCompactNav ? (
           <div className="hidden md:block">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -217,7 +232,7 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
         <div className="flex items-center gap-2">
           <LanguageToggle dark={isDark} />
           <div className="hidden md:flex items-center gap-2">
-            {isAdmin ? (
+            {showAdminHeaderShortcut ? (
               <Button asChild variant="green" size="sm">
                 <Link href="/admin" data-testid="nav-admin">
                   Admin
@@ -239,9 +254,20 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
               </>
             )}
           </div>
+          {hideClientHeaderNav && user ? (
+            <Button
+              data-testid="logout-btn-mobile-minimal"
+              className="md:hidden"
+              variant={isDark ? "glass" : "outline"}
+              size="sm"
+              onClick={logout}
+            >
+              {t("nav.logout")}
+            </Button>
+          ) : null}
           <button
             data-testid="mobile-menu-btn"
-            className={`md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full ${isDark ? "bg-white/10 text-white" : "bg-black/5 text-brand-ink"}`}
+            className={`md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full ${isDark ? "bg-white/10 text-white" : "bg-black/5 text-brand-ink"} ${hideClientHeaderNav ? "hidden" : ""}`}
             onClick={() => setOpen(!open)}
             aria-label="menu"
           >
@@ -250,7 +276,7 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
         </div>
       </div>
 
-      {open && (
+      {open && !hideClientHeaderNav && (
         <div className="md:hidden border-t border-black/5 bg-white">
           <div className="space-y-1 px-4 py-3">
             {links.map((l) => (
@@ -265,7 +291,7 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
               </Link>
             ))}
             <div className="pt-2 flex flex-wrap gap-2">
-              {isAdmin ? (
+              {showAdminHeaderShortcut ? (
                 <Button asChild className="flex-1" variant="green">
                   <Link href="/admin" onClick={() => setOpen(false)}>
                     Admin

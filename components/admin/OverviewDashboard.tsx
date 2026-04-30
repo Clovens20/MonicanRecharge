@@ -24,6 +24,7 @@ type Overview = {
   todayRev: number;
   todayTx: number;
   reloadly: number;
+  reloadlyBalanceSource?: "live" | "env";
   reloadlyLow: boolean;
   reloadlyMinAlert: number;
   customers: number;
@@ -54,9 +55,20 @@ export function OverviewDashboard() {
   }
 
   useEffect(() => {
-    load();
-    const id = setInterval(load, 5000);
-    return () => clearInterval(id);
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void load();
+    };
+    tick();
+    const id = setInterval(tick, 25000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   return (

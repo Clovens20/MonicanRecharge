@@ -1,20 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { RechargeForm } from "@/components/RechargeForm";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLang } from "@/lib/i18n/LanguageProvider";
 import { getTx, getContacts, ContactLocal, TxLocal } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowRight, Lightning, Phone, Plus, Wallet } from "@phosphor-icons/react";
 import { formatCurrency } from "@/lib/utils";
-import { toast } from "sonner";
-import { getAutoPrintReceipt, setAutoPrintReceipt, getCashierName, setCashierName } from "@/lib/receipt/caisse";
 import { LaunchExtras } from "@/components/dashboard/LaunchExtras";
+import { mergeRemoteAndLocalTx } from "@/lib/tx/mergeRemoteLocal";
 
 export default function DashboardPage() {
   const { t } = useLang();
@@ -22,20 +20,38 @@ export default function DashboardPage() {
   const [contacts, setContacts] = useState<ContactLocal[]>([]);
   const [user, setUser] = useState<any>(null);
   const [hasAgent, setHasAgent] = useState(false);
-  const [autoPrint, setAutoPrint] = useState(false);
-  const [cashierInput, setCashierInput] = useState("");
+
+  const refreshTx = useCallback(async () => {
+    const local = getTx();
+    const sb = createClient();
+    if (!sb) {
+      setTx(local.slice(0, 5));
+      return;
+    }
+    const { data: u } = await sb.auth.getUser();
+    if (!u.user) {
+      setTx(local.slice(0, 5));
+      return;
+    }
+    const r = await fetch("/api/me/tranzaksyon", { credentials: "include" });
+    if (!r.ok) {
+      setTx(local.slice(0, 5));
+      return;
+    }
+    const j = (await r.json()) as { transactions?: TxLocal[] };
+    const remote = Array.isArray(j.transactions) ? j.transactions : [];
+    setTx(mergeRemoteAndLocalTx(remote, local).slice(0, 5));
+  }, []);
 
   useEffect(() => {
-    setAutoPrint(getAutoPrintReceipt());
-    setCashierInput(getCashierName());
-    setTx(getTx().slice(0, 5));
+    void refreshTx();
     setContacts(getContacts().slice(0, 6));
     const sb = createClient();
     if (sb) sb.auth.getUser().then(({ data }) => setUser(data.user));
-    const refresh = () => setTx(getTx().slice(0, 5));
-    window.addEventListener("storage", refresh);
-    return () => window.removeEventListener("storage", refresh);
-  }, []);
+    const onStorage = () => void refreshTx();
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [refreshTx]);
 
   useEffect(() => {
     if (!user) {
@@ -75,43 +91,6 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : null}
-
-        <div className="mt-6 rounded-3xl border border-black/5 bg-white p-5 sm:p-6" data-testid="caisse-settings">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-black/50">— {t("caisse.title")}</div>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-black/5 bg-brand-bg p-4">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 accent-emerald-600"
-                checked={autoPrint}
-                onChange={(e) => setAutoPrint(e.target.checked)}
-              />
-              <span className="text-sm font-medium text-brand-ink">{t("caisse.auto_print")}</span>
-            </label>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.15em] text-black/45">{t("caisse.cashier")}</div>
-              <input
-                value={cashierInput}
-                onChange={(e) => setCashierInput(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-medium outline-none ring-emerald-100 focus:border-emerald-500 focus:ring-4"
-                placeholder="Jean"
-              />
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-4"
-            onClick={() => {
-              setAutoPrintReceipt(autoPrint);
-              setCashierName(cashierInput);
-              toast.success(t("caisse.saved"));
-            }}
-          >
-            {t("caisse.save")}
-          </Button>
-          <p className="mt-3 text-xs leading-relaxed text-black/50">{t("caisse.note")}</p>
-        </div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-7">

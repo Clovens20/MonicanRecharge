@@ -67,7 +67,7 @@ export function RechargeForm({
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [plan, setPlan] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "moncash" | "cash">("stripe");
+  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "cash">("stripe");
   const [submitting, setSubmitting] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [successTx, setSuccessTx] = useState<TxLocal | null>(null);
@@ -138,6 +138,36 @@ export function RechargeForm({
     }
   }
 
+  /** Stripe Checkout via API Next (.env STRIPE_SECRET_KEY) — la recharge part après webhook Stripe. */
+  async function startStripeCheckout() {
+    if (!operator || !finalAmount) return;
+    const res = await fetch("/api/recharge/stripe-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        operatorId: operator.id,
+        operatorName: operator.name,
+        recipientPhone: phone.replace(/\D/g, ""),
+        countryCode: country.code,
+        amount: finalAmount,
+        tip: type === "data_plan" ? "data_plan" : "airtime",
+        planId: type === "data_plan" && plan ? plan : undefined,
+      }),
+    });
+    const data = (await res.json()) as { url?: string; error?: string };
+    if (res.status === 401) {
+      toast.error(t("form.stripe_login_required"));
+      const next = pathname?.startsWith("/") && !pathname.startsWith("//") ? pathname : "/";
+      router.push(`/konekte?next=${encodeURIComponent(next)}`);
+      return;
+    }
+    if (!res.ok || !data.url) {
+      throw new Error(data.error || t("form.stripe_checkout_error"));
+    }
+    window.location.assign(data.url);
+  }
+
   async function handleSubmit() {
     if (!operator || !phone || !finalAmount) {
       toast.error("Please complete all steps");
@@ -151,31 +181,11 @@ export function RechargeForm({
       } catch {}
       const refFinal = (refKod || agentRefCode || "").trim() || undefined;
 
-      const isCaisse =
-        (pathname === "/tableau-de-bord" ||
-          (pathname?.startsWith("/tableau-de-bord/") && !pathname.includes("/ajan"))) ||
-        (pathname?.startsWith("/recharge") && kesyeOk);
+      const isCaisse = Boolean(pathname?.startsWith("/recharge") && kesyeOk);
       const channelHint = isCaisse ? ("caisse" as const) : undefined;
 
-      if (paymentMethod === "moncash") {
-        const res = await fetch("/api/recharge/moncash-order", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            operatorId: operator.id,
-            recipientPhone: { countryCode: country.code, number: phone.replace(/\D/g, "") },
-            amount: finalAmount,
-            type,
-            planId: plan,
-            paymentMethod: "moncash",
-            userEmail: user?.email || null,
-            refKod: refFinal,
-            channelHint,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.orderPublicId) throw new Error(data.error || "Moncash order failed");
-        router.push(`/peye/moncash/${data.orderPublicId}`);
+      if (paymentMethod === "stripe") {
+        await startStripeCheckout();
         return;
       }
 
@@ -188,7 +198,7 @@ export function RechargeForm({
           amount: finalAmount,
           type,
           planId: plan,
-          paymentMethod,
+          paymentMethod: "cash",
           userEmail: user?.email || null,
           refKod: refFinal,
           channelHint,
@@ -747,8 +757,9 @@ export function RechargeForm({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={cn("grid gap-2", isStoreUi ? "grid-cols-2" : "grid-cols-1")}>
                     <button
+                      type="button"
                       data-testid="pay-stripe"
                       onClick={() => setPaymentMethod("stripe")}
                       className={cn(
@@ -770,10 +781,10 @@ export function RechargeForm({
                     </button>
                     {isStoreUi ? (
                       <button
+                        type="button"
                         data-testid="pay-cash"
                         onClick={() => {
                           setPaymentMethod("cash");
-                          // Ouverture tiroir dès choix "cash" (workflow boutique).
                           void tryOpenCashDrawer();
                         }}
                         className={cn(
@@ -794,28 +805,7 @@ export function RechargeForm({
                           CASH · TIROIR ZHONGJI
                         </div>
                       </button>
-                    ) : (
-                      <button
-                        data-testid="pay-moncash"
-                        onClick={() => setPaymentMethod("moncash")}
-                        className={cn(
-                          "flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition-all",
-                          paymentMethod === "moncash"
-                            ? L
-                              ? "border-[#00D084] bg-[#00D084]/15"
-                              : "border-brand-green bg-emerald-50"
-                            : L
-                              ? "border-white/10 bg-white/5 hover:border-[#00D084]/40"
-                              : "border-black/10 hover:border-brand-green/50",
-                        )}
-                      >
-                        <div className="flex items-center gap-2 text-sm font-semibold">
-                          {L ? <span aria-hidden>💚</span> : null}
-                          <Wallet className="h-4 w-4" /> {t("form.pay_moncash")}
-                        </div>
-                        <div className={cn("text-[10px] uppercase tracking-[0.18em]", L ? "text-slate-500" : "text-black/40")}>Mobile money</div>
-                      </button>
-                    )}
+                    ) : null}
                   </div>
 
                   <div className="flex gap-3 pt-1">
@@ -835,7 +825,13 @@ export function RechargeForm({
                       disabled={submitting}
                       onClick={handleSubmit}
                     >
-                      {submitting ? <span className="animate-pulse">{t("status.pending")}</span> : <>{t("btn.send")}</>}
+                      {submitting ? (
+                        <span className="animate-pulse">{t("status.pending")}</span>
+                      ) : paymentMethod === "stripe" ? (
+                        <>{t("form.cta_pay_card")}</>
+                      ) : (
+                        <>{t("btn.send")}</>
+                      )}
                     </Button>
                   </div>
                 </div>

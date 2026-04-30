@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { CaisseSettingsPanel } from "@/components/CaisseSettingsPanel";
 
 export default function StoreRechargePage() {
   const [identifiant, setIdentifiant] = useState("");
@@ -156,7 +157,10 @@ export default function StoreRechargePage() {
                 </Button>
               </div>
             ) : (
-              <RechargeForm />
+              <>
+                <CaisseSettingsPanel />
+                <RechargeForm />
+              </>
             )}
           </div>
         )}

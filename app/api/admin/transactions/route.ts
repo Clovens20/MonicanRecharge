@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isRechargeAdmin } from "@/lib/ajan/admin";
 import { fetchTransactionsFiltered } from "@/lib/admin/mongo-stats";
+import { fetchSupabaseTransactionsFiltered } from "@/lib/admin/supabase-transactions";
 
 export async function GET(req: Request) {
   const sb = createClient();
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const rows = await fetchTransactionsFiltered({
+  const q = {
     from: searchParams.get("from") || undefined,
     to: searchParams.get("to") || undefined,
     channel: searchParams.get("channel") || undefined,
@@ -23,9 +24,20 @@ export async function GET(req: Request) {
     status: searchParams.get("status") || undefined,
     search: searchParams.get("q") || undefined,
     limit: parseInt(searchParams.get("limit") || "200", 10),
+  };
+  const [mongoRows, sbRows] = await Promise.all([
+    fetchTransactionsFiltered(q),
+    fetchSupabaseTransactionsFiltered(q),
+  ]);
+  const rows = [...sbRows, ...mongoRows].sort((a, b) => {
+    const ta = new Date(String(a.created_at || 0)).getTime();
+    const tb = new Date(String(b.created_at || 0)).getTime();
+    return tb - ta;
   });
+  const lim = Math.min(q.limit || 200, 500);
+  const sliced = rows.slice(0, lim);
 
-  const enriched = rows.map((r) => {
+  const enriched = sliced.map((r) => {
     const gross = Number(r.amount_usd || 0);
     const cost = Number(r.cost_usd ?? gross * 0.92);
     return {

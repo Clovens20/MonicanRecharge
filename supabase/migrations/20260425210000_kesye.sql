@@ -14,4 +14,6 @@ CREATE INDEX IF NOT EXISTS kesye_aktif_idx ON public.kesye (aktif);
 ALTER TABLE public.kesye ENABLE ROW LEVEL SECURITY;
 
 -- Pa gen aksè JWT dirèk — sèlman service role (API admin / login)
+DROP POLICY IF EXISTS "kesye_deny_jwt" ON public.kesye;
+
 CREATE POLICY "kesye_deny_jwt" ON public.kesye FOR ALL USING (false);

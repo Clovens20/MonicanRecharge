@@ -6,6 +6,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { ReloadlyAdminStrip } from "@/components/admin/ReloadlyAdminStrip";
 import { createClient } from "@/lib/supabase/client";
+import { isAdminEmailClient } from "@/lib/auth/admin-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -22,7 +23,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   async function refreshAccess() {
     setLoading(true);
     try {
-      const r = await fetch("/api/auth/is-admin", { credentials: "include" });
+      const r = await fetch("/api/auth/is-admin", { credentials: "include", cache: "no-store" });
       const d = await r.json();
       setAdminOk(Boolean(d.admin));
     } catch {
@@ -33,7 +34,34 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    void refreshAccess();
+    let cancelled = false;
+    async function run() {
+      const sb = createClient();
+      if (sb) {
+        const { data: sess } = await sb.auth.getSession();
+        if (cancelled) return;
+        const mail = sess.session?.user?.email;
+        if (mail && isAdminEmailClient(mail)) {
+          setAdminOk(true);
+          setLoading(false);
+        }
+      }
+      if (cancelled) return;
+      try {
+        const r = await fetch("/api/auth/is-admin", { credentials: "include", cache: "no-store" });
+        if (cancelled) return;
+        const d = await r.json();
+        setAdminOk(Boolean(d.admin));
+      } catch {
+        if (!cancelled) setAdminOk(false);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function loginAdmin(e: React.FormEvent) {

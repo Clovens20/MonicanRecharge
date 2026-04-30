@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { isRechargeAdmin } from "@/lib/ajan/admin";
 import { getReloadlyLastRechargeAt, getReloadlyMinAlertUsd } from "@/lib/admin/reloadly-settings";
+import { getReloadlyBalanceUsdForAdmin } from "@/lib/reloadly/adminBalance";
 
 export async function GET() {
   const sb = createClient();
@@ -13,13 +14,15 @@ export async function GET() {
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isRechargeAdmin(user.id, user.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const balance = parseFloat(process.env.RELOADLY_BALANCE_USD || "0");
+  const { balanceUsd, source, liveError } = await getReloadlyBalanceUsdForAdmin();
   const minAlert = await getReloadlyMinAlertUsd();
   const lastRecharge = await getReloadlyLastRechargeAt();
-  const low = balance < minAlert;
+  const low = balanceUsd < minAlert;
 
   return NextResponse.json({
-    balance,
+    balance: balanceUsd,
+    balanceSource: source,
+    liveError: liveError ?? null,
     minAlert,
     low,
     lastRecharge,

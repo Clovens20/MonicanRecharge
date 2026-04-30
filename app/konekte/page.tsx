@@ -36,7 +36,10 @@ export default function LoginPage() {
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Bienvenue");
-    router.push("/auth/konplete");
+    const nextRaw = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
+    const nextSafe =
+      nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") && !nextRaw.includes("://") ? nextRaw : null;
+    router.push(nextSafe ? `/auth/konplete?next=${encodeURIComponent(nextSafe)}` : "/auth/konplete");
   }
 
   async function handleGoogle() {
@@ -46,9 +49,15 @@ export default function LoginPage() {
     }
     const sb = createClient();
     if (!sb) return;
+    const nextRaw = new URLSearchParams(window.location.search).get("next");
+    const nextSafe =
+      nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") && !nextRaw.includes("://") ? nextRaw : null;
+    const konplete = nextSafe
+      ? `${window.location.origin}/auth/konplete?next=${encodeURIComponent(nextSafe)}`
+      : `${window.location.origin}/auth/konplete`;
     await sb.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/konplete` },
+      options: { redirectTo: konplete },
     });
   }
 

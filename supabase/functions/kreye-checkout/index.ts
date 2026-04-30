@@ -109,8 +109,8 @@ Deno.serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: {
-              name: `Recharge ${operatorName} — ${recipientPhone}`,
-              description: `${tip === "airtime" ? "Airtime" : "Forfè data"} $${prixKoutaj}`,
+              name: `Recharge ${String(operatorName).normalize("NFD").replace(/[\u0300-\u036f]/g, "")} - ${recipientPhone}`,
+              description: `${tip === "airtime" ? "Airtime" : "Forfait data"} $${prixKoutaj}`,
             },
             unit_amount: Math.round(prixVann * 100),
           },
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
         userId,
         planId: planId ?? "",
       },
-      success_url: `${appUrl}/siksè?tx=${tx.id}`,
+      success_url: `${appUrl}/success?tx=${tx.id}`,
       cancel_url: `${appUrl}/?cancelled=true`,
     });
 
