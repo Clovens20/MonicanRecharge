@@ -64,7 +64,13 @@ function buildNavLinks(opts: {
   return links;
 }
 
-export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
+export function Navbar({
+  variant = "light",
+  mode = "default",
+}: {
+  variant?: "light" | "dark";
+  mode?: "default" | "agent";
+}) {
   const { t } = useLang();
   const path = usePathname() || "";
   const router = useRouter();
@@ -131,11 +137,16 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
   );
 
   /** Raccourci header : pas sur le tableau de bord client (lien « Administration » reste dans le menu). */
+  const isAgentMode = mode === "agent";
+  const onAgentSurface = isAgentMode || path.startsWith("/agent") || path.startsWith("/ajan");
+  const loginHref = onAgentSurface ? "/konekte?next=%2Fagent" : "/konekte";
+
   const showAdminHeaderShortcut = useMemo(() => {
+    if (isAgentMode) return false;
     const p = path.replace(/\/$/, "") || "/";
     if (p === "/tableau-de-bord") return false;
     return isAdmin;
-  }, [path, isAdmin]);
+  }, [path, isAdmin, isAgentMode]);
 
   /** Client connecté : pas /admin ni /recharge (flux boutique garde la nav). */
   const clientCompactNav = useMemo(
@@ -146,7 +157,7 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
   const onAgentHub = path.startsWith("/tableau-de-bord/ajan");
 
   /** Client : pas de liens Accueil / Historique / etc. dans le header (accès via le tableau de bord). Sauf hub agent. */
-  const hideClientHeaderNav = clientCompactNav && !onAgentHub;
+  const hideClientHeaderNav = isAgentMode || (clientCompactNav && !onAgentHub);
 
   async function logout() {
     const sb = createClient();
@@ -161,7 +172,7 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
   return (
     <header className={`sticky top-0 z-40 ${isDark ? "dark-glass" : "glass"}`}>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href={clientCompactNav ? "/tableau-de-bord" : "/"} data-testid="nav-logo" className="flex items-center gap-2">
+        <Link href={isAgentMode ? "/agent" : clientCompactNav ? "/tableau-de-bord" : "/"} data-testid="nav-logo" className="flex items-center gap-2">
           <span className={`grid h-9 w-9 place-items-center rounded-xl ${isDark ? "bg-white text-brand-ink" : "bg-brand-ink text-white"}`}>
             <Lightning weight="fill" className="h-5 w-5" />
           </span>
@@ -251,7 +262,7 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
             ) : (
               <>
                 <Button asChild data-testid="login-btn" variant={isDark ? "glass" : "ghost"} size="sm">
-                  <Link href="/konekte">{t("nav.login")}</Link>
+                  <Link href={loginHref}>{t("nav.login")}</Link>
                 </Button>
                 <Button asChild data-testid="signup-btn" variant="green" size="sm">
                   <Link href="/enskri">{t("nav.signup")}</Link>
@@ -310,7 +321,7 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
               ) : (
                 <>
                   <Button asChild className="flex-1" variant="outline">
-                    <Link href="/konekte">{t("nav.login")}</Link>
+                    <Link href={loginHref}>{t("nav.login")}</Link>
                   </Button>
                   <Button asChild className="flex-1" variant="green">
                     <Link href="/enskri">{t("nav.signup")}</Link>

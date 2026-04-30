@@ -120,7 +120,7 @@ export default function AjanDashboardPage() {
   if (agent === undefined) {
     return (
       <main className="min-h-screen bg-brand-bg">
-        <Navbar />
+        <Navbar mode="agent" />
         <div className="mx-auto max-w-xl px-4 py-24 text-center text-black/50">Chajman…</div>
       </main>
     );
@@ -129,7 +129,7 @@ export default function AjanDashboardPage() {
   if (!agent) {
     return (
       <main className="min-h-screen bg-brand-bg">
-        <Navbar />
+        <Navbar mode="agent" />
         <section className="mx-auto max-w-lg px-4 py-20 text-center">
           <h1 className="font-display text-2xl font-bold text-brand-ink">Ou poko ajan</h1>
           <p className="mt-3 text-sm text-black/55">Aplike oswa konekte ak kont ki apwouve.</p>
@@ -138,7 +138,7 @@ export default function AjanDashboardPage() {
               <Link href="/ajan/aplike">Aplike</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/konekte">Konekte</Link>
+              <Link href="/konekte?next=%2Fagent">Konekte</Link>
             </Button>
           </div>
         </section>
@@ -149,7 +149,7 @@ export default function AjanDashboardPage() {
 
   return (
     <main className="min-h-screen bg-brand-bg">
-      <Navbar />
+      <Navbar mode="agent" />
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

@@ -20,7 +20,7 @@ const benefits = [
 export default function AjanLandingPage() {
   return (
     <main className="min-h-screen bg-brand-bg">
-      <Navbar />
+      <Navbar mode="agent" />
       <section className="relative overflow-hidden bg-brand-ink text-white">
         <div className="noise" />
         <div className="hero-radial absolute inset-0 opacity-90" />
@@ -33,7 +33,7 @@ export default function AjanLandingPage() {
               <Link href="/ajan/aplike">Aplike kòm Ajan Gratis →</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-full border-white/30 bg-white/5 text-white hover:bg-white/10">
-              <Link href="/konekte">Deja ajan? Konekte</Link>
+              <Link href="/konekte?next=%2Fagent">Deja ajan? Konekte</Link>
             </Button>
           </div>
         </div>

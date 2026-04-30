@@ -87,9 +87,12 @@ export default function AjanByenveniPage() {
     if (!sb) return;
     setLoading(true);
     try {
-      const { error: upErr } = await sb.auth.updateUser({ password });
+      const { error: upErr } = await sb.auth.updateUser({
+        password,
+        data: { must_change_password: false, password_changed_at: new Date().toISOString() },
+      });
       if (upErr) throw upErr;
-      router.push("/tableau-de-bord/ajan?nouvo=1");
+      router.push("/agent?nouvo=1");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erè — eseye ankò.";
       setError(msg);
@@ -101,7 +104,7 @@ export default function AjanByenveniPage() {
   if (boot) {
     return (
       <main className="min-h-screen bg-brand-bg">
-        <Navbar />
+        <Navbar mode="agent" />
         <div className="mx-auto max-w-md px-4 py-24 text-center text-sm text-black/50">Chajman…</div>
         <Footer />
       </main>
@@ -110,7 +113,7 @@ export default function AjanByenveniPage() {
 
   return (
     <main className="min-h-screen bg-brand-bg">
-      <Navbar />
+      <Navbar mode="agent" />
       <section className="mx-auto max-w-md px-4 py-16 sm:px-6">
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-2xl text-emerald-700">

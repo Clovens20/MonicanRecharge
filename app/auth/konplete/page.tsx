@@ -20,10 +20,16 @@ export default function AuthKonpletePage() {
       return;
     }
     void sb.auth.getSession().then(({ data }) => {
-      const email = data.session?.user?.email;
+      const user = data.session?.user;
+      const email = user?.email;
       if (!email) {
         setMsg("Pa gen sesyon — konekte ankò.");
         router.replace("/konekte");
+        return;
+      }
+      const mustChange = Boolean((user?.user_metadata as { must_change_password?: boolean } | undefined)?.must_change_password);
+      if (mustChange) {
+        router.replace("/ajan/byenveni?premye=1");
         return;
       }
       const sp = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");

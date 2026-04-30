@@ -150,16 +150,36 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: e5.message }, { status: 500 });
   }
 
-  const dashUrl = `${appUrl}/tableau-de-bord/ajan`;
-  if (!usedInvite) {
+  const agentPlatformUrl = `${appUrl}/agent`;
+  const refUrl = `${appUrl}/?ref=${encodeURIComponent(code)}`;
+  const konekteUrl = `${appUrl}/konekte`;
+
+  if (usedInvite) {
     await sendResendHtml(
       email,
-      "Ajan Monican — Aplikasyon apwouve (kont egziste deja)",
+      "Monican Recharge — Aplikasyon apwouve (etap modpas)",
       `<p>Bonjou ${apl.non_konplè},</p>
-      <p><strong>Aplikasyon ou apwouve!</strong> Ou te deja gen yon kont ak imèl sa a — konekte ak modpas ou.</p>
+      <p><strong>Aplikasyon ou apwouve!</strong></p>
+      <p><strong>1)</strong> Gade <strong>bwat imèl ou</strong> — ou pral resevwa yon mesaj (Monican / Supabase) ak bouton pou <strong>aksepte envitasyon</strong> epi <strong>kreye modpas ou</strong>. Klike lyen an.</p>
+      <p><strong>2)</strong> Apre modpas la fin kreye, platfòm revandè ou a (tablo, lyen pèsonèl, komisyon):<br/>
+      <a href="${agentPlatformUrl}">${agentPlatformUrl}</a></p>
+      <p><strong>3)</strong> Kòd ajan ou: <strong>${code}</strong><br/>
+      Lyen pou pataje ak kliyan (URL konplè):<br/>
+      <a href="${refUrl}">${refUrl}</a></p>
+      <p style="color:#555;font-size:12px;">Pa gen modpas tanporè — sèlman lyen envitasyon an imèl la.</p>`
+    );
+  } else {
+    await sendResendHtml(
+      email,
+      "Monican Recharge — Aplikasyon apwouve (kont deja egziste)",
+      `<p>Bonjou ${apl.non_konplè},</p>
+      <p><strong>Aplikasyon ou apwouve!</strong> Ou te deja gen yon kont ak imèl sa a — <strong>konekte</strong> ak modpas ou.</p>
       <p>Kòd ajan ou: <strong>${code}</strong></p>
-      <p>Lyen pèsonèl: <code>${appUrl}/?ref=${code}</code></p>
-      <p><a href="${appUrl}/konekte">Konekte</a> — tablo ajan: <a href="${dashUrl}">${dashUrl}</a></p>`
+      <p>Platfòm revandè ou (tablo ajan):<br/>
+      <a href="${agentPlatformUrl}">${agentPlatformUrl}</a></p>
+      <p>Lyen pou pataje ak kliyan:<br/>
+      <a href="${refUrl}">${refUrl}</a></p>
+      <p><a href="${konekteUrl}">Konekte isit</a></p>`
     );
   }
 

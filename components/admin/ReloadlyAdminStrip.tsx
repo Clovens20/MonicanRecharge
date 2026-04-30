@@ -20,8 +20,25 @@ type D = {
 export function ReloadlyAdminStrip() {
   const [d, setD] = useState<D | null>(null);
   const [minInput, setMinInput] = useState("");
+  const [canQuery, setCanQuery] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/auth/is-admin", { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setCanQuery(Boolean(j?.admin));
+      })
+      .catch(() => {
+        if (!cancelled) setCanQuery(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function load() {
+    if (!canQuery) return;
     const r = await fetch("/api/admin/reloadly-settings");
     if (r.status === 401 || r.status === 403) return;
     const j = await r.json();
@@ -32,6 +49,7 @@ export function ReloadlyAdminStrip() {
   }
 
   useEffect(() => {
+    if (!canQuery) return;
     const runSoon = () => void load();
     let idleId: number | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -46,7 +64,7 @@ export function ReloadlyAdminStrip() {
       if (idleId !== undefined) cancelIdleCallback(idleId);
       if (timeoutId !== undefined) clearTimeout(timeoutId);
     };
-  }, []);
+  }, [canQuery]);
 
   async function saveMin() {
     const v = parseFloat(minInput);
