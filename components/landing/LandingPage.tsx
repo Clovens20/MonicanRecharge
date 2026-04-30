@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
@@ -10,6 +9,7 @@ import { useLang } from "@/lib/i18n/LanguageProvider";
 import { cn } from "@/lib/utils";
 import { LandingFooter } from "./LandingFooter";
 import { LandingNavbar } from "./LandingNavbar";
+import { TestimonialReviewForm } from "./TestimonialReviewForm";
 
 const RechargeForm = dynamic(
   () => import("@/components/RechargeForm").then((m) => ({ default: m.RechargeForm })),
@@ -49,20 +49,30 @@ const COVERAGE_STRIP_LOGOS = [
   { name: "Tigo", src: "/operators/tigo.svg" },
 ];
 
-/** Avis : photos de client·e·s noirs·es ; textes en kreyòl ; carte 3 = espagnol + même idée en kreyòl. */
+/** URLs Unsplash vérifiées (HTTP 200) — sans `crop=faces` (évite 404 Imgix). */
+const U = (id: string, w: number) =>
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
+
+/**
+ * Avis — portraits (diaspora / peau foncée), liens testés.
+ * `<img>` natif : évite l’optimiseur Next « upstream image failed » sur certaines URLs.
+ */
 const LANDING_TESTIMONIALS = [
   {
-    img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=160&h=160&fit=crop&crop=faces&q=75",
+    img: U("1531746020798-e6953c6e8e04", 224),
+    initials: "MC",
     quoteKr:
       "Depi Miami mwen voye Digicel pou manman m chak semèn — Monican fè l vit, epi li resevwa l an kèk segond. Mèsi anpil!",
   },
   {
-    img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=160&h=160&fit=crop&crop=faces&q=75",
+    img: U("1519085360753-af0119f7cbe7", 224),
+    initials: "JB",
     quoteKr:
       "Sèvis la klè, peman an san pwoblèm, livrezon an instantane. Se pi bon fason pou m rete konekte ak fanmi mwen an Ayiti. Mwen rekòmande l!",
   },
   {
-    img: "https://images.unsplash.com/photo-1589156280159-27698b77008e?w=160&h=160&fit=crop&crop=faces&q=75",
+    img: U("1524504388940-b1c1722653e1", 224),
+    initials: "ME",
     quoteEs:
       "Con Monican envío recarga a mi familia en Haití desde Santo Domingo — rápido, fácil y sin complicaciones.",
     quoteKr:
@@ -70,15 +80,105 @@ const LANDING_TESTIMONIALS = [
   },
 ] as const;
 
-const AVATARS = [
-  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=96&h=96&fit=crop",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop",
-  "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=96&h=96&fit=crop",
-  "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=96&h=96&fit=crop",
-  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=96&h=96&fit=crop",
-];
+const HERO_COMMUNITY_FACES = [
+  { src: U("1531746020798-e6953c6e8e04", 88), initials: "MC" },
+  { src: U("1519085360753-af0119f7cbe7", 88), initials: "JB" },
+  { src: U("1524504388940-b1c1722653e1", 88), initials: "SR" },
+  { src: U("1619895862022-09114b41f16f", 88), initials: "KL" },
+  { src: U("1489424731084-a5d8b219a5bb", 88), initials: "PD" },
+] as const;
+
+/**
+ * Même logique d’avis, visuels orientés diaspora / Afrique & Caraïbes (stock libre de droits).
+ * Unsplash ne garantit pas l’origine nationale des personnes — évite d’affirmer « Haïtiens » au sens strict.
+ */
+const LANDING_TESTIMONIALS_KR = [
+  {
+    img: U("1507003211169-0a1dd7228f2d", 224),
+    initials: "MC",
+    quoteKr:
+      "Depi Miami mwen voye Digicel pou manman m chak semèn — Monican fè l vit, epi li resevwa l an kèk segond. Mèsi anpil!",
+  },
+  {
+    img: U("1573496359142-b8d87734a5a2", 224),
+    initials: "JB",
+    quoteKr:
+      "Sèvis la klè, peman an san pwoblèm, livrezon an instantane. Se pi bon fason pou m rete konekte ak fanmi mwen an Ayiti. Mwen rekòmande l!",
+  },
+  {
+    img: U("1463453091185-61582044d556", 224),
+    initials: "ME",
+    quoteEs:
+      "Con Monican envío recarga a mi familia en Haití desde Santo Domingo — rápido, fácil y sin complicaciones.",
+    quoteKr:
+      "Ak Monican mwen voye recharge pou fanmi mwen an Ayiti depi Santo Domingo — rapid, fasil, san tet anba.",
+  },
+] as const;
+
+const HERO_COMMUNITY_FACES_KR = [
+  { src: U("1507003211169-0a1dd7228f2d", 88), initials: "MC" },
+  { src: U("1573496359142-b8d87734a5a2", 88), initials: "JB" },
+  { src: U("1463453091185-61582044d556", 88), initials: "AL" },
+  { src: U("1519085360753-af0119f7cbe7", 88), initials: "KL" },
+  { src: U("1524504388940-b1c1722653e1", 88), initials: "PD" },
+] as const;
+
+/** Portrait circulaire : `<img>` + repli initiales. */
+function LandingFaceAvatar({
+  src,
+  initials,
+  sizePx,
+  className,
+}: {
+  src: string;
+  initials: string;
+  sizePx: 44 | 56;
+  className?: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const dim = sizePx === 44 ? "h-11 w-11" : "h-14 w-14";
+  const textSize = sizePx === 44 ? "text-[10px]" : "text-sm";
+  if (broken) {
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center justify-center rounded-full border-2 border-[#0A0E1A] bg-gradient-to-br from-neutral-800 to-black font-bold uppercase tracking-tight text-white/90 ring-2 ring-[#00D084]/30",
+          dim,
+          textSize,
+          className,
+        )}
+      >
+        {initials}
+      </div>
+    );
+  }
+  return (
+    <div
+      className={cn(
+        "relative shrink-0 overflow-hidden rounded-full border-2 border-[#0A0E1A] bg-neutral-900 ring-2 ring-[#00D084]/30",
+        dim,
+        className,
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        width={sizePx}
+        height={sizePx}
+        className="h-full w-full object-cover"
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer-when-downgrade"
+        onError={() => setBroken(true)}
+      />
+    </div>
+  );
+}
 
 const STORY_IMG = "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=720&h=900&fit=crop&q=75";
+/** Bandeau hero — version kreyòl : scènes fanmi / diaspora (même remarque stock que ci-dessus). */
+const STORY_IMG_KR = U("1511895426328-dc8714191300", 1080);
 const FAMILY_STRIP = [
   {
     src: "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=480&h=320&fit=crop&q=75",
@@ -100,6 +200,14 @@ const FAMILY_STRIP = [
     src: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=480&h=320&fit=crop&q=75",
     caption: "Recharge instantane · 150+ peyi 🌍",
   },
+] as const;
+
+const FAMILY_STRIP_KR = [
+  { src: U("1511895426328-dc8714191300", 640), caption: "Fanmi nan Miami · Recharge Digicel voye ✅" },
+  { src: U("1522071820081-009f0129c71c", 640), caption: "Diaspora Kanada · Natcom konekte 📱" },
+  { src: U("1463453091185-61582044d556", 640), caption: "Depi Paris · Voye an 8 segond ⚡" },
+  { src: U("1517841905240-472988babdf9", 640), caption: "Kliyan Monican · 3,000+ satisfè ⭐" },
+  { src: U("1573496359142-b8d87734a5a2", 640), caption: "Recharge instantane · 150+ peyi 🌍" },
 ] as const;
 
 function useAnimatedNumber(target: number, enabled: boolean, durationMs = 1600) {
@@ -150,7 +258,11 @@ function StatCell({
 }
 
 export function LandingPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const heroFaces = lang === "kr" ? HERO_COMMUNITY_FACES_KR : HERO_COMMUNITY_FACES;
+  const landingTestimonials = lang === "kr" ? LANDING_TESTIMONIALS_KR : LANDING_TESTIMONIALS;
+  const familyStrip = lang === "kr" ? FAMILY_STRIP_KR : FAMILY_STRIP;
+  const storyImg = lang === "kr" ? STORY_IMG_KR : STORY_IMG;
   const statsRef = useRef(null);
   const statsInView = useInView(statsRef, { once: true, margin: "-10% 0px" });
   const [calcN, setCalcN] = useState(120);
@@ -271,22 +383,9 @@ export function LandingPage() {
               className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8"
             >
               <div className="flex -space-x-3">
-                {AVATARS.map((src, i) => (
-                  <div
-                    key={src}
-                    className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#0A0E1A] ring-2 ring-[#00D084]/30"
-                    style={{ zIndex: AVATARS.length - i }}
-                  >
-                    <Image
-                      src={src}
-                      alt=""
-                      width={44}
-                      height={44}
-                      className="object-cover"
-                      sizes="44px"
-                      priority={i === 0}
-                      loading={i === 0 ? "eager" : "lazy"}
-                    />
+                {heroFaces.map((face, i) => (
+                  <div key={`${face.src}-${i}`} className="relative" style={{ zIndex: heroFaces.length - i }}>
+                    <LandingFaceAvatar src={face.src} initials={face.initials} sizePx={44} />
                   </div>
                 ))}
               </div>
@@ -406,18 +505,20 @@ export function LandingPage() {
               animate={{ x: ["0%", "-50%"] }}
               transition={{ duration: 24, ease: "linear", repeat: Infinity }}
             >
-              {[...FAMILY_STRIP, ...FAMILY_STRIP].map((item, idx) => (
+              {[...familyStrip, ...familyStrip].map((item, idx) => (
                 <div
                   key={`${item.src}-${idx}`}
-                  className="relative h-32 min-w-[220px] overflow-hidden rounded-2xl sm:h-40 sm:min-w-[260px]"
+                  className="relative h-32 min-w-[220px] overflow-hidden rounded-2xl bg-neutral-900 sm:h-40 sm:min-w-[260px]"
                 >
-                  <Image
+                  {/* img direct : l’optimiseur Next échoue souvent sur Unsplash → cadres « blancs » vides */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     src={item.src}
                     alt=""
-                    fill
-                    className="object-cover"
-                    sizes="(max-width:640px) 220px, 260px"
+                    className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer-when-downgrade"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                   <div className="absolute bottom-2 left-2 right-2 text-[11px] font-semibold leading-snug text-white sm:text-xs">
@@ -580,7 +681,7 @@ export function LandingPage() {
                 { n: "landing.testi_n3", l: "landing.testi_l3", d: "landing.testi_d3" },
               ] as const
             ).map((meta, i) => {
-              const card = LANDING_TESTIMONIALS[i]!;
+              const card = landingTestimonials[i]!;
               return (
               <motion.div
                 key={meta.n}
@@ -590,9 +691,7 @@ export function LandingPage() {
                 transition={{ delay: i * 0.12 }}
                 className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-lg shadow-black/20 backdrop-blur-xl transition hover:-translate-y-1 hover:border-white/15 hover:shadow-xl"
               >
-                <div className="relative h-14 w-14 overflow-hidden rounded-full ring-2 ring-[#00D084]/25">
-                  <Image src={card.img} alt="" width={56} height={56} className="object-cover" loading="lazy" />
-                </div>
+                <LandingFaceAvatar src={card.img} initials={card.initials} sizePx={56} />
                 <div className="mt-3 flex text-amber-400">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star key={s} weight="fill" className="h-4 w-4" />
@@ -620,6 +719,7 @@ export function LandingPage() {
             );
             })}
           </div>
+          <TestimonialReviewForm />
         </div>
       </section>
 
@@ -751,13 +851,14 @@ export function LandingPage() {
             viewport={{ once: true }}
             className="relative aspect-[4/5] max-h-[520px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#1A0A2E] to-[#0D1B2A]"
           >
-            <Image
-              src={STORY_IMG}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={storyImg}
               alt=""
-              fill
-              className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 45vw"
+              className="absolute inset-0 h-full w-full object-cover"
               loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer-when-downgrade"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0E1A] via-transparent to-transparent" />
             <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white backdrop-blur-md">

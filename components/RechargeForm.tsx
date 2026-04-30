@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -57,7 +56,8 @@ export function RechargeForm({
   const L = visualMode === "landing";
   const router = useRouter();
   const pathname = usePathname();
-  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  /** Toujours `true` au 1er rendu (SSR + hydratation) ; valeur réelle après mount dans useEffect. */
+  const [online, setOnline] = useState(true);
   const [kesyeOk, setKesyeOk] = useState(false);
   const [step, setStep] = useState(1);
   const [country, setCountry] = useState(COUNTRIES[0]);
@@ -80,13 +80,13 @@ export function RechargeForm({
   }, []);
 
   useEffect(() => {
-    const up = () => setOnline(true);
-    const down = () => setOnline(false);
-    window.addEventListener("online", up);
-    window.addEventListener("offline", down);
+    const sync = () => setOnline(navigator.onLine !== false);
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
     return () => {
-      window.removeEventListener("online", up);
-      window.removeEventListener("offline", down);
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
     };
   }, []);
 
