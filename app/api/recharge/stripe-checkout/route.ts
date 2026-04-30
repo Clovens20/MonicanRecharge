@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "NEXT_PUBLIC_APP_URL manquant (ex. http://localhost:3100) — requis pour les URLs de retour Stripe.",
+          "NEXT_PUBLIC_APP_URL manquant (ex. https://recharge.monican.shop) — requis pour les URLs de retour Stripe.",
       },
       { status: 503 },
     );

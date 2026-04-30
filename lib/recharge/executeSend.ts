@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "crypto";
-import { DATA_PLANS, OPERATORS } from "@/lib/reloadly/mock";
+import { DATA_PLANS, OPERATORS, type Operator } from "@/lib/reloadly/mock";
+import { countryByCode, dialForCountry } from "@/lib/reloadly/countries";
 import { getDb } from "@/lib/mongodb";
 import { applyAgentCommission } from "@/lib/ajan/commission";
 
@@ -13,6 +14,11 @@ export type RechargeBody = {
   userEmail?: string | null;
   /** Lè vann depi tablo kès (tablèt). */
   channelHint?: "caisse" | "online";
+  /** Opérateur détecté Reloadly absent du mock `OPERATORS`. */
+  operatorDisplayName?: string;
+  operatorCurrency?: string;
+  operatorFxRate?: number;
+  operatorLogoUrl?: string | null;
 };
 
 export type RechargeRecord = {
@@ -57,11 +63,28 @@ export function buildRechargeFromBody(
   body: RechargeBody,
   refKod: string | null
 ): { ok: true; record: RechargeRecord; finalAmount: number } | { ok: false; error: string } {
-  const op = OPERATORS.find((o) => o.id === body.operatorId);
-  if (!op) return { ok: false, error: "Operator not found" };
-  const cc = body.recipientPhone?.countryCode;
+  const ccRaw = body.recipientPhone?.countryCode;
+  const cc = String(ccRaw || "").toUpperCase().slice(0, 2);
   const num = body.recipientPhone?.number;
   if (!cc || !num) return { ok: false, error: "Missing recipient" };
+
+  let op: Operator | undefined = OPERATORS.find((o) => o.id === body.operatorId);
+  if (!op && body.operatorId && body.operatorDisplayName) {
+    const row = countryByCode(cc);
+    op = {
+      id: body.operatorId,
+      name: String(body.operatorDisplayName),
+      countryCode: cc,
+      countryName: row?.name || cc,
+      flag: row?.flag || "🌍",
+      logoUrl: body.operatorLogoUrl || "/operators/orange.svg",
+      fxRate: typeof body.operatorFxRate === "number" && Number.isFinite(body.operatorFxRate) ? body.operatorFxRate : 1,
+      currency: body.operatorCurrency || "USD",
+      prefixes: [],
+      type: "airtime",
+    };
+  }
+  if (!op) return { ok: false, error: "Operator not found" };
 
   let finalAmount = body.amount ?? 0;
   if (body.type === "data_plan" && body.planId) {
@@ -78,7 +101,7 @@ export function buildRechargeFromBody(
 
   const txId = randomUUID();
   const reference = genRef();
-  const dial = cc === "HT" ? "+509" : "+1";
+  const dial = dialForCountry(cc);
   const pay = body.paymentMethod ?? "stripe";
   const channel: RechargeRecord["channel"] = refKod
     ? "ajan"

@@ -31,13 +31,18 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://monican-recharge.vercel.app";
+/** Métadonnées / OG : jamais d’URL localhost (réseaux sociaux + crawlers). */
+const rawAppUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
+const siteUrl =
+  rawAppUrl && !/^https?:\/\/localhost(?::\d+)?/i.test(rawAppUrl)
+    ? rawAppUrl
+    : "https://recharge.monican.shop";
 
 export const metadata: Metadata = {
   title: "Monican Recharge — Voye Recharge Rapid, Fasil, Kote ou Ye",
   description:
     "Send instant phone credit & data plans to Haiti (Digicel, Natcom) and 150+ countries. Trusted, fast, secure.",
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(`${siteUrl}/`),
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -52,13 +57,14 @@ export const metadata: Metadata = {
     title: "Monican Recharge",
     description: "Voye Recharge — Rapid, Fasil, Kote ou Ye",
     type: "website",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Monican Recharge" }],
+    url: siteUrl,
+    images: [{ url: `${siteUrl}/og-image.png`, width: 1200, height: 630, alt: "Monican Recharge" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Monican Recharge",
     description: "Voye Recharge — Rapid, Fasil",
-    images: [`${siteUrl.replace(/\/$/, "")}/og-image.png`],
+    images: [`${siteUrl}/og-image.png`],
   },
   other: {
     "mobile-web-app-capable": "yes",

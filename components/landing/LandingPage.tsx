@@ -1,28 +1,49 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { motion } from "framer-motion";
 import { CheckCircle, Lightning, Star } from "@phosphor-icons/react";
 import { useLang } from "@/lib/i18n/LanguageProvider";
 import { cn } from "@/lib/utils";
 import { LandingFooter } from "./LandingFooter";
 import { LandingNavbar } from "./LandingNavbar";
+import { LandingRechargeFormSlot } from "./LandingRechargeFormSlot";
 import { TestimonialReviewForm } from "./TestimonialReviewForm";
 
-const RechargeForm = dynamic(
-  () => import("@/components/RechargeForm").then((m) => ({ default: m.RechargeForm })),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className="min-h-[520px] w-full max-w-2xl rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl animate-pulse"
-        aria-busy
-      />
-    ),
-  },
-);
+/** Déclenche les compteurs stats une fois la section visible (viewport initial + IntersectionObserver). */
+function useOnceIntersecting(ref: RefObject<HTMLElement | null>) {
+  const [visible, setVisible] = useState(false);
+
+  useLayoutEffect(() => {
+    if (visible) return;
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const vh = window.innerHeight;
+    if (r.top < vh + 200 && r.bottom > -200) setVisible(true);
+  }, [ref, visible]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || visible) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setVisible(true);
+            io.disconnect();
+            return;
+          }
+        }
+      },
+      { threshold: 0, rootMargin: "120px 0px 120px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, visible]);
+  return visible;
+}
 
 const OPERATOR_LOGOS = [
   { name: "Digicel", src: "/operators/digicel.svg" },
@@ -213,17 +234,25 @@ const FAMILY_STRIP_KR = [
 function useAnimatedNumber(target: number, enabled: boolean, durationMs = 1600) {
   const [n, setN] = useState(0);
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setN(0);
+      return;
+    }
     let raf = 0;
+    let cancelled = false;
     const t0 = performance.now();
     const tick = (now: number) => {
+      if (cancelled) return;
       const p = Math.min(1, (now - t0) / durationMs);
       const ease = 1 - Math.pow(1 - p, 3);
-      setN(target * ease);
+      setN(p >= 1 ? target : target * ease);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
   }, [enabled, target, durationMs]);
   return n;
 }
@@ -263,8 +292,8 @@ export function LandingPage() {
   const landingTestimonials = lang === "kr" ? LANDING_TESTIMONIALS_KR : LANDING_TESTIMONIALS;
   const familyStrip = lang === "kr" ? FAMILY_STRIP_KR : FAMILY_STRIP;
   const storyImg = lang === "kr" ? STORY_IMG_KR : STORY_IMG;
-  const statsRef = useRef(null);
-  const statsInView = useInView(statsRef, { once: true, margin: "-10% 0px" });
+  const statsRef = useRef<HTMLElement | null>(null);
+  const statsInView = useOnceIntersecting(statsRef);
   const [calcN, setCalcN] = useState(120);
   const [calcAvg, setCalcAvg] = useState(15);
   const estCommission = useMemo(() => Math.round(calcN * calcAvg * 0.025), [calcN, calcAvg]);
@@ -553,7 +582,7 @@ export function LandingPage() {
             <h2 className="font-landing-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{t("landing.form_section_title")}</h2>
             <p className="mt-3 text-lg text-slate-400">{t("landing.form_section_sub")}</p>
           </motion.div>
-          <RechargeForm visualMode="landing" showReceiptPanel={false} />
+          <LandingRechargeFormSlot />
         </div>
       </section>
 

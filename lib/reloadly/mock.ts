@@ -74,6 +74,31 @@ export const OPERATORS: Operator[] = [
     prefixes: [],
     type: "airtime",
   },
+  /** RD — IDs à aligner sur Reloadly (GET /operators?countryIsoName=Dominican+Republic) si les recharges réelles échouent. */
+  {
+    id: 1643,
+    name: "Altice Dominicana",
+    countryCode: "DO",
+    countryName: "Dominican Republic",
+    flag: "🇩🇴",
+    logoUrl: "/operators/orange.svg",
+    fxRate: 1,
+    currency: "USD",
+    prefixes: ["809", "829"],
+    type: "airtime",
+  },
+  {
+    id: 1644,
+    name: "Claro Dominicana",
+    countryCode: "DO",
+    countryName: "Dominican Republic",
+    flag: "🇩🇴",
+    logoUrl: "/operators/claro.svg",
+    fxRate: 1,
+    currency: "USD",
+    prefixes: ["849"],
+    type: "airtime",
+  },
 ];
 
 export const DATA_PLANS: DataPlan[] = [
@@ -86,9 +111,17 @@ export const DATA_PLANS: DataPlan[] = [
   { id: "ntc-3", operatorId: 528, name: "Natcom Max", data: "15 GB", validity: "30d", priceUsd: 15 },
 ];
 
+/** Chiffres nationaux pour détection (sans indicatif pays). */
+function digitsNationalForDetect(phone: string): string {
+  let d = String(phone || "").replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+  return d;
+}
+
 export function detectOperator(phone: string, countryCode: string): Operator | null {
+  const cc = String(countryCode || "").toUpperCase().slice(0, 2);
   const cleaned = phone.replace(/\D/g, "").replace(/^509/, "");
-  if (countryCode === "HT") {
+  if (cc === "HT") {
     const d = cleaned.charAt(0);
     const d2 = cleaned.slice(0, 2);
     const natcom = OPERATORS.find((o) => o.id === 528);
@@ -97,7 +130,18 @@ export function detectOperator(phone: string, countryCode: string): Operator | n
     if (digicel && digicel.prefixes.includes(d)) return digicel;
     return digicel || null;
   }
-  return OPERATORS.find((o) => o.countryCode === countryCode) || null;
+
+  if (cc === "DO") {
+    const nat = digitsNationalForDetect(phone);
+    if (nat.length < 10) return null;
+    const ops = OPERATORS.filter((o) => o.countryCode === "DO");
+    for (const op of ops) {
+      if (op.prefixes.length > 0 && op.prefixes.some((p) => nat.startsWith(p))) return op;
+    }
+    return ops[0] || null;
+  }
+
+  return OPERATORS.find((o) => o.countryCode === cc) || null;
 }
 
 export const QUICK_AMOUNTS = [5, 10, 15, 20, 25, 50];

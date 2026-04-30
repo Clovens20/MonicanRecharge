@@ -17,6 +17,12 @@ import {
 } from "@phosphor-icons/react";
 import { useLang } from "@/lib/i18n/LanguageProvider";
 import { OPERATORS, DATA_PLANS, QUICK_AMOUNTS, detectOperator, Operator } from "@/lib/reloadly/mock";
+import {
+  RECHARGE_COUNTRIES,
+  nationalDigits,
+  inferCountryAndNational,
+  shouldAutoPickCountryFromPhone,
+} from "@/lib/reloadly/countries";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -27,13 +33,6 @@ import { createClient } from "@/lib/supabase/client";
 import { ReceiptSuccessPanel } from "@/components/ReceiptSuccessPanel";
 import { getCashierName } from "@/lib/receipt/caisse";
 import { tryOpenCashDrawer } from "@/lib/receipt/caisse";
-
-const COUNTRIES = [
-  { code: "HT", flag: "🇭🇹", dial: "+509", name: "Haiti" },
-  { code: "US", flag: "🇺🇸", dial: "+1", name: "United States" },
-  { code: "CA", flag: "🇨🇦", dial: "+1", name: "Canada" },
-  { code: "DO", flag: "🇩🇴", dial: "+1", name: "Dominican Republic" },
-];
 
 export function RechargeForm({
   compact = false,
@@ -60,9 +59,10 @@ export function RechargeForm({
   const [online, setOnline] = useState(true);
   const [kesyeOk, setKesyeOk] = useState(false);
   const [step, setStep] = useState(1);
-  const [country, setCountry] = useState(COUNTRIES[0]);
+  const [country, setCountry] = useState(RECHARGE_COUNTRIES[0]!);
   const [phone, setPhone] = useState("");
   const [operator, setOperator] = useState<Operator | null>(null);
+  const [detectingOperator, setDetectingOperator] = useState(false);
   const [type, setType] = useState<"airtime" | "data_plan">("airtime");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
@@ -100,15 +100,90 @@ export function RechargeForm({
 
   const isStoreUi = pathname?.startsWith("/recharge");
 
-  // Auto-detect operator
+  /** Étape 2 : pays déduit de +33, +509, 00…, ou 509xxxxxxxx (Haïti). Ne remplace pas un pays +1 par un autre (US/CA/DO…). */
   useEffect(() => {
-    if (phone.length >= 4) {
-      const op = detectOperator(phone, country.code);
-      setOperator(op);
-    } else {
-      setOperator(null);
+    if (step !== 2) return;
+    if (!shouldAutoPickCountryFromPhone(phone)) return;
+    const tid = window.setTimeout(() => {
+      const inferred = inferCountryAndNational(phone);
+      if (!inferred || inferred.country.code === country.code) return;
+      if (inferred.country.dial === "+1" && country.dial === "+1") return;
+      setCountry(inferred.country);
+    }, 180);
+    return () => window.clearTimeout(tid);
+  }, [phone, step, country.code, country.dial]);
+
+  /** Étape 2 : Haïti = détection locale ; autres pays = Reloadly auto-detect (API) ou mock. */
+  useEffect(() => {
+    if (step !== 2) return;
+    if (country.code === "HT") setDetectingOperator(false);
+    const digits = nationalDigits(phone, country.dial);
+
+    if (country.code === "HT") {
+      if (digits.length >= 4) setOperator(detectOperator(phone, "HT"));
+      return;
     }
-  }, [phone, country]);
+
+    if (digits.length < 7) {
+      setOperator(null);
+      return;
+    }
+
+    const ac = new AbortController();
+    const tid = window.setTimeout(async () => {
+      setDetectingOperator(true);
+      try {
+        const r = await fetch("/api/reloadly/auto-detect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: digits, countryCode: country.code }),
+          signal: ac.signal,
+        });
+        const rawText = await r.text();
+        let j: { operator?: { id: number; name: string; logoUrl?: string | null; countryCode?: string } } = {};
+        try {
+          j = JSON.parse(rawText) as typeof j;
+        } catch {
+          j = {};
+        }
+
+        const applyDetected = (id: number, name: string, logoUrl?: string | null) => {
+          const row = RECHARGE_COUNTRIES.find((c) => c.code === country.code);
+          setOperator({
+            id,
+            name,
+            countryCode: country.code,
+            countryName: row?.name || country.code,
+            flag: row?.flag || "🌍",
+            logoUrl: logoUrl || "/operators/orange.svg",
+            fxRate: 1,
+            currency: "USD",
+            prefixes: [],
+            type: "airtime",
+          });
+        };
+
+        if (j.operator && typeof j.operator.id === "number" && j.operator.name) {
+          applyDetected(j.operator.id, j.operator.name, j.operator.logoUrl);
+        } else {
+          const local = detectOperator(digits, country.code);
+          if (local) {
+            applyDetected(local.id, local.name, local.logoUrl);
+          } else {
+            setOperator(null);
+          }
+        }
+      } catch {
+        if (!ac.signal.aborted) setOperator(null);
+      } finally {
+        if (!ac.signal.aborted) setDetectingOperator(false);
+      }
+    }, 450);
+    return () => {
+      ac.abort();
+      window.clearTimeout(tid);
+    };
+  }, [step, phone, country.code, country.dial]);
 
   const finalAmount = useMemo(() => {
     if (type === "data_plan" && plan) {
@@ -119,6 +194,9 @@ export function RechargeForm({
     const c = parseFloat(customAmount);
     return isNaN(c) ? 0 : c;
   }, [type, amount, customAmount, plan]);
+
+  const nationalPhone = useMemo(() => nationalDigits(phone, country.dial), [phone, country.dial]);
+  const phoneStep2Ok = country.code === "HT" ? nationalPhone.length >= 4 : nationalPhone.length >= 7;
 
   const filteredPlans = operator ? DATA_PLANS.filter((p) => p.operatorId === operator.id) : [];
 
@@ -133,9 +211,19 @@ export function RechargeForm({
     const op = OPERATORS.find((o) => o.id === opId);
     if (op) {
       setOperator(op);
-      setCountry(COUNTRIES.find((c) => c.code === op.countryCode) || COUNTRIES[0]);
+      setCountry(RECHARGE_COUNTRIES.find((c) => c.code === op.countryCode) || RECHARGE_COUNTRIES[0]!);
       setStep(2);
     }
+  }
+
+  function operatorMetaPayload() {
+    if (!operator) return {};
+    return {
+      operatorDisplayName: operator.name,
+      operatorCurrency: operator.currency,
+      operatorFxRate: operator.fxRate,
+      operatorLogoUrl: operator.logoUrl,
+    };
   }
 
   /** Stripe Checkout via API Next (.env STRIPE_SECRET_KEY) — la recharge part après webhook Stripe. */
@@ -148,11 +236,12 @@ export function RechargeForm({
       body: JSON.stringify({
         operatorId: operator.id,
         operatorName: operator.name,
-        recipientPhone: phone.replace(/\D/g, ""),
+        recipientPhone: nationalPhone,
         countryCode: country.code,
         amount: finalAmount,
         tip: type === "data_plan" ? "data_plan" : "airtime",
         planId: type === "data_plan" && plan ? plan : undefined,
+        ...operatorMetaPayload(),
       }),
     });
     const data = (await res.json()) as { url?: string; error?: string };
@@ -194,7 +283,7 @@ export function RechargeForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           operatorId: operator.id,
-          recipientPhone: { countryCode: country.code, number: phone.replace(/\D/g, "") },
+          recipientPhone: { countryCode: country.code, number: nationalDigits(phone, country.dial) },
           amount: finalAmount,
           type,
           planId: plan,
@@ -202,6 +291,7 @@ export function RechargeForm({
           userEmail: user?.email || null,
           refKod: refFinal,
           channelHint,
+          ...operatorMetaPayload(),
         }),
       });
       const data = await res.json();
@@ -415,7 +505,13 @@ export function RechargeForm({
                   })}
                   <button
                     data-testid="op-card-other"
-                    onClick={() => setStep(2)}
+                    type="button"
+                    onClick={() => {
+                      setOperator(null);
+                      setPhone("");
+                      setCountry(RECHARGE_COUNTRIES.find((c) => c.code === "US") || RECHARGE_COUNTRIES[0]!);
+                      setStep(2);
+                    }}
                     className={cn(
                       "group flex items-center gap-4 rounded-2xl border p-4 text-left transition-all",
                       L
@@ -449,19 +545,28 @@ export function RechargeForm({
                       data-testid="country-select"
                       value={country.code}
                       onChange={(e) => {
-                        const c = COUNTRIES.find((x) => x.code === e.target.value);
+                        const c = RECHARGE_COUNTRIES.find((x) => x.code === e.target.value);
                         if (c) setCountry(c);
                       }}
                       className={cn(
-                        "h-12 rounded-xl border px-3 text-base font-semibold focus:outline-none focus:ring-4",
+                        "h-12 min-w-[10.5rem] shrink-0 rounded-xl border px-3 text-base font-semibold focus:outline-none focus:ring-4",
                         L
-                          ? "border-white/15 bg-white/10 text-white focus:border-[#00D084] focus:ring-[#00D084]/25"
+                          ? "border-white/20 bg-[#0F172A] text-slate-100 shadow-inner [color-scheme:dark] focus:border-[#00D084] focus:ring-[#00D084]/25"
                           : "border-black/10 bg-white text-brand-ink focus:border-brand-green focus:ring-emerald-100",
                       )}
                     >
-                      {COUNTRIES.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.flag} {c.dial}
+                      {RECHARGE_COUNTRIES.map((c) => (
+                        <option
+                          key={c.code}
+                          value={c.code}
+                          className={L ? "bg-[#0F172A] text-slate-100" : "bg-white text-brand-ink"}
+                          style={
+                            L
+                              ? ({ backgroundColor: "#0F172A", color: "#f1f5f9" } as React.CSSProperties)
+                              : ({ backgroundColor: "#ffffff", color: "#0f172a" } as React.CSSProperties)
+                          }
+                        >
+                          {c.flag} {c.name} · {c.dial}
                         </option>
                       ))}
                     </select>
@@ -469,7 +574,7 @@ export function RechargeForm({
                       data-testid="phone-input"
                       type="tel"
                       inputMode="tel"
-                      placeholder={t("form.phone_placeholder")}
+                      placeholder={country.code === "HT" ? t("form.phone_placeholder") : t("form.phone_placeholder_intl")}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       autoFocus
@@ -480,9 +585,13 @@ export function RechargeForm({
                       }
                     />
                   </div>
+                  <p className={cn("text-[11px] leading-snug", L ? "text-slate-500" : "text-black/45")}>{t("form.country_auto_hint")}</p>
 
                   <div className="min-h-[44px]">
-                    {operator && phone.length >= 4 ? (
+                    {detectingOperator && country.code !== "HT" ? (
+                      <div className={cn("text-xs font-medium", L ? "text-slate-400" : "text-black/50")}>{t("form.detecting_operator")}</div>
+                    ) : null}
+                    {operator && phoneStep2Ok ? (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -497,8 +606,12 @@ export function RechargeForm({
                         <CheckCircle weight="fill" className="h-5 w-5" />
                         {detectedLine(operator)}
                       </motion.div>
-                    ) : phone.length > 0 ? (
-                      <div className={cn("text-xs", L ? "text-slate-500" : "text-black/40")}>{t("form.detected")}…</div>
+                    ) : nationalPhone.length > 0 && !detectingOperator ? (
+                      <div className={cn("text-xs", L ? "text-slate-500" : "text-black/40")}>
+                        {phoneStep2Ok && !operator && country.code !== "HT"
+                          ? t("form.operator_not_found")
+                          : `${t("form.detected")}…`}
+                      </div>
                     ) : null}
                   </div>
 
@@ -515,7 +628,7 @@ export function RechargeForm({
                       data-testid="next-step3"
                       variant="green"
                       className={cn("flex-1", L && "bg-[#00D084] hover:bg-emerald-400 shadow-[0_8px_30px_rgba(0,208,132,0.35)]")}
-                      disabled={!operator || phone.length < 4}
+                      disabled={!operator || !phoneStep2Ok || detectingOperator}
                       onClick={() => setStep(3)}
                     >
                       {t("btn.continue")} <ArrowRight className="h-4 w-4" />
