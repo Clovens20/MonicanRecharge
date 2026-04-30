@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 
-export default function AjanTopupSuccessPage() {
+function AjanTopupSuccessContent() {
   const sp = useSearchParams();
   const router = useRouter();
   const [msg, setMsg] = useState("Nou ap verifye peman an...");
@@ -61,6 +61,26 @@ export default function AjanTopupSuccessPage() {
           </div>
         </div>
       </section>
+      <Footer />
+    </main>
+  );
+}
+
+export default function AjanTopupSuccessPage() {
+  return (
+    <main className="min-h-screen bg-brand-bg">
+      <Navbar mode="agent" />
+      <Suspense
+        fallback={
+          <section className="mx-auto max-w-xl px-4 py-20 text-center">
+            <div className="rounded-3xl border border-black/10 bg-white p-8 text-sm text-black/60">
+              Nou ap verifye peman an...
+            </div>
+          </section>
+        }
+      >
+        <AjanTopupSuccessContent />
+      </Suspense>
       <Footer />
     </main>
   );
