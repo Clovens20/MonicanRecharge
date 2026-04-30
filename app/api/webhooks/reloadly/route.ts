@@ -1,15 +1,15 @@
 /**
  * Webhook Reloadly — statuts différés (PROCESSING → SUCCESSFUL / FAILED)
- * 
+ *
  * 📍 Placer ce fichier dans :
  *    app/api/webhooks/reloadly/route.ts
- * 
+ *
  * 🔧 Variables .env requises :
  *    RELOADLY_WEBHOOK_SECRET=<signing secret du dashboard Reloadly>
- * 
+ *
  * 🌐 URL à saisir dans Reloadly Dashboard > Developers > Webhooks :
- *    https://monican-recharge.vercel.app/api/webhooks/reloadly
- * 
+ *    https://recharge.monican.shop/api/webhooks/reloadly
+ *
  * 📡 IPs Reloadly autorisées (déjà filtrées dans le code) :
  *    54.84.138.60  |  54.84.66.109
  */
@@ -45,7 +45,6 @@ function verifySignature(
     .createHmac("sha256", secret)
     .update(dataToSign)
     .digest("hex");
-  // Comparaison en temps constant pour éviter les timing attacks
   try {
     return crypto.timingSafeEqual(
       Buffer.from(expected, "hex"),
@@ -87,7 +86,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Signature invalide" }, { status: 401 });
     }
   } else {
-    // ⚠️ Avertissement si le secret n'est pas configuré
     console.warn("[reloadly-webhook] RELOADLY_WEBHOOK_SECRET non défini — signature non vérifiée !");
   }
 
@@ -102,11 +100,10 @@ export async function POST(req: NextRequest) {
   console.log("[reloadly-webhook] Event reçu:", JSON.stringify(event));
 
   // ── 5. Extraction des données clés ───────────────────────────────────────
-  // Reloadly envoie différents formats selon le service (topup vs data)
-  const reloadlyTxId    = String(event.transactionId ?? event.id ?? "");
-  const customId        = String(event.customIdentifier ?? "");       // "MONICAN-<uuid>"
-  const rawStatus       = String(event.status ?? "").toUpperCase();
-  const operatorTxId    = String(event.operatorTransactionId ?? "");
+  const reloadlyTxId = String(event.transactionId ?? event.id ?? "");
+  const customId     = String(event.customIdentifier ?? "");
+  const rawStatus    = String(event.status ?? "").toUpperCase();
+  const operatorTxId = String(event.operatorTransactionId ?? "");
 
   if (!reloadlyTxId && !customId) {
     console.warn("[reloadly-webhook] Aucun identifiant dans le payload");
@@ -123,7 +120,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Supabase non configuré" }, { status: 503 });
   }
 
-  // Chercher la transaction par customIdentifier (MONICAN-<uuid>) OU par reloadly_transaction_id
   const internalId = customId.startsWith("MONICAN-")
     ? customId.replace("MONICAN-", "")
     : null;
@@ -147,7 +143,6 @@ export async function POST(req: NextRequest) {
 
   if (updErr) {
     console.error("[reloadly-webhook] Erreur mise à jour Supabase:", updErr.message);
-    // Retourner 500 pour que Reloadly réessaie
     return NextResponse.json({ error: updErr.message }, { status: 500 });
   }
 
@@ -158,8 +153,3 @@ export async function POST(req: NextRequest) {
   // ── 8. Toujours répondre 200 à Reloadly ──────────────────────────────────
   return NextResponse.json({ received: true });
 }
-
-// Désactiver le bodyParser Next.js (on lit le body brut pour la signature)
-export const config = {
-  api: { bodyParser: false },
-};
