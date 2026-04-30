@@ -72,7 +72,13 @@ export default function AdminAjanPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return toast.error(data.error || "Erè");
-    toast.success(`Apwouve — ${data.kòd_ajan || ""}`);
+    const suffix =
+      data.invite_sent === true
+        ? " Imèl envitasyon Supabase voye (kreye modpas)."
+        : data.existing_account === true
+          ? " Kont te deja egziste — gade imèl ou."
+          : "";
+    toast.success(`Apwouve — ${data.kòd_ajan || ""}.${suffix}`);
     load();
   }
 

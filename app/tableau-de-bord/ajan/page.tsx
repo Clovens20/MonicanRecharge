@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -14,6 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 
 type Agent = {
   kòd_ajan: string;
+  non_biznis: string | null;
   to_komisyon: number;
   balans_komisyon: number;
   total_tranzaksyon: number;
@@ -70,6 +72,16 @@ export default function AjanDashboardPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (agent === undefined || agent === null) return;
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("nouvo") !== "1") return;
+    const name = agent.non_biznis?.trim() || agent.kòd_ajan;
+    toast.success(`Byenveni ${name}! Kòd ou: ${agent.kòd_ajan}`, { duration: 8000 });
+    router.replace("/tableau-de-bord/ajan");
+  }, [router, agent]);
 
   async function copyRef() {
     if (!refUrl) return;

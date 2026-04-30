@@ -45,6 +45,7 @@ Deno.serve(async (req) => {
       amount?: number | string;
       tip?: string;
       planId?: string;
+      refKod?: string;
     };
 
     const {
@@ -55,6 +56,7 @@ Deno.serve(async (req) => {
       amount,
       tip = "airtime",
       planId,
+      refKod,
     } = body;
 
     if (!operatorId || !operatorName || !recipientPhone || amount == null) {
@@ -72,29 +74,54 @@ Deno.serve(async (req) => {
     }
 
     const prixVann = Math.ceil(prixKoutaj * 1.08 * 100) / 100;
-    const benefis = prixVann - prixKoutaj;
+    const benefisBrut = prixVann - prixKoutaj;
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const { data: tx, error } = await supabase
-      .from("tranzaksyon")
-      .insert({
-        user_id: userId,
-        operator_id: operatorIdNum,
-        operatè: operatorName,
-        pays_kòd: String(countryCode).toUpperCase().slice(0, 2),
-        nimewo_resevwa: String(recipientPhone),
-        montant_usd: prixVann,
-        pri_koutaj: prixKoutaj,
-        pri_vann: prixVann,
-        benefis,
-        tip: tip || "airtime",
-        plan_id: planId ?? null,
-        mòd_peman: "stripe",
-        estati: "annatant",
-      })
-      .select("id")
-      .single();
+    const refSan = String(refKod || "")
+      .trim()
+      .replace(/[^A-Za-z0-9\-_]/g, "")
+      .slice(0, 48);
+    let ref_kòd: string | null = null;
+    let ajan_id: string | null = null;
+    let komisyon_ajan = 0;
+    let komisyon_pousantaj: number | null = null;
+    if (refSan.length >= 4) {
+      const { data: ag } = await supabase.from("ajan").select("user_id, to_komisyon, estati").eq("kòd_ajan", refSan).maybeSingle();
+      if (ag?.estati === "aktif") {
+        const pct = Number(ag.to_komisyon ?? 5);
+        const p = Number.isFinite(pct) && pct > 0 ? pct : 5;
+        ref_kòd = refSan;
+        ajan_id = ag.user_id;
+        komisyon_pousantaj = p;
+        komisyon_ajan = Math.round(prixVann * (p / 100) * 100) / 100;
+      }
+    }
+    const benefisNet = Math.round((benefisBrut - komisyon_ajan) * 100) / 100;
+
+    const insertRow: Record<string, unknown> = {
+      user_id: userId,
+      operator_id: operatorIdNum,
+      operatè: operatorName,
+      pays_kòd: String(countryCode).toUpperCase().slice(0, 2),
+      nimewo_resevwa: String(recipientPhone),
+      montant_usd: prixVann,
+      pri_koutaj: prixKoutaj,
+      pri_vann: prixVann,
+      benefis: benefisNet,
+      tip: tip || "airtime",
+      plan_id: planId ?? null,
+      mòd_peman: "stripe",
+      estati: "annatant",
+    };
+    if (ref_kòd) {
+      insertRow.ref_kòd = ref_kòd;
+      insertRow.ajan_id = ajan_id;
+      insertRow.komisyon_ajan = komisyon_ajan;
+      insertRow.komisyon_pousantaj = komisyon_pousantaj;
+    }
+
+    const { data: tx, error } = await supabase.from("tranzaksyon").insert(insertRow).select("id").single();
 
     if (error || !tx) {
       return jsonResponse({ error: error?.message ?? "Insert tranzaksyon echwe" }, 500);
@@ -132,6 +159,7 @@ Deno.serve(async (req) => {
         tip: tip || "airtime",
         userId,
         planId: planId ?? "",
+        refKod: ref_kòd ?? "",
       },
       success_url: `${appUrl}/success?tx=${tx.id}`,
       cancel_url: `${appUrl}/?cancelled=true`,

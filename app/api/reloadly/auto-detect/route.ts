@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { detectOperator } from "@/lib/reloadly/mock";
+import { validatePhone, effectiveCountryForReloadly, digitsOnly } from "@/lib/operator-detection";
 import { fetchReloadlyAccessToken, getReloadlyBaseUrl, getReloadlyCredentials } from "@/lib/reloadly/auth";
 
 type ReloadlyDetectShape = {
@@ -19,17 +20,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ operator: null, error: "JSON invalide" }, { status: 400 });
   }
 
-  const phone = String(body.phone || "").replace(/[\s+\-()]/g, "");
+  const phoneDigits = digitsOnly(String(body.phone || ""));
   const countryCode = String(body.countryCode || "").toUpperCase().slice(0, 2);
-  if (!phone || !countryCode) {
+  if (!phoneDigits || !countryCode) {
     return NextResponse.json({ operator: null, error: "phone et countryCode requis" }, { status: 400 });
+  }
+
+  const effectiveCc = effectiveCountryForReloadly(phoneDigits, countryCode);
+  const v = validatePhone(phoneDigits, effectiveCc);
+  if (!v.valid && v.partial) {
+    return NextResponse.json({ operator: null, source: "incomplete" as const });
+  }
+  if (!v.valid) {
+    return NextResponse.json(
+      { operator: null, error: v.error || "INVALID_PHONE", type: "INVALID_PHONE" as const },
+      { status: 400 },
+    );
+  }
+
+  if (effectiveCc === "HT") {
+    const mockOp = detectOperator(phoneDigits, "HT");
+    return NextResponse.json({ operator: mockOp, source: "mock" as const });
   }
 
   const nanpIso = new Set(["US", "CA", "DO", "PR", "JM", "TT"]);
   const phoneCandidates = (() => {
-    const d = phone.replace(/\D/g, "");
-    const list = [phone, d];
-    if (nanpIso.has(countryCode) && d.length === 10 && !d.startsWith("1")) {
+    const d = phoneDigits.replace(/\D/g, "");
+    const list = [phoneDigits, d];
+    if (nanpIso.has(effectiveCc) && d.length === 10 && !d.startsWith("1")) {
       list.push(`1${d}`);
     }
     return [...new Set(list.filter(Boolean))];
@@ -40,7 +58,7 @@ export async function POST(req: Request) {
       const token = await fetchReloadlyAccessToken();
       const base = getReloadlyBaseUrl();
       for (const candidate of phoneCandidates) {
-        const url = `${base}/operators/auto-detect/phone/${encodeURIComponent(candidate)}/countries/${encodeURIComponent(countryCode)}?suggestedAmountsMap=true`;
+        const url = `${base}/operators/auto-detect/phone/${encodeURIComponent(candidate)}/countries/${encodeURIComponent(effectiveCc)}?suggestedAmountsMap=true`;
         const res = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -52,7 +70,7 @@ export async function POST(req: Request) {
           const id = Number(raw.operatorId ?? raw.id);
           if (Number.isFinite(id) && id > 0) {
             const logoUrl = Array.isArray(raw.logoUrls) ? raw.logoUrls[0] : typeof raw.logoUrls === "string" ? raw.logoUrls : null;
-            const cc = raw.country?.isoCode || countryCode;
+            const cc = raw.country?.isoCode || effectiveCc;
             return NextResponse.json({
               operator: {
                 id,
@@ -73,7 +91,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const mockOp = detectOperator(phone, countryCode);
+  const mockOp = detectOperator(phoneDigits, effectiveCc);
   return NextResponse.json({
     operator: mockOp,
     source: "mock" as const,

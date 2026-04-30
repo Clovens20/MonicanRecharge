@@ -37,7 +37,10 @@ export default function AjanAplikePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Erè");
-      toast.success("Aplikasyon voye! N ap kontakte w.");
+      toast.success(
+        "✅ Aplikasyon ou resevwa! N ap revize l nan 24-48 èdtan. Tcheke imèl ou (spam / promosyon si ou pa wè li).",
+        { duration: 8000 },
+      );
       setNonKonplè("");
       setImèl("");
       setTelefòn("");

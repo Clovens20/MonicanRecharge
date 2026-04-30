@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.1";
 import { assertServiceRole } from "../_shared/auth-service-role.ts";
 import { corsOptions, jsonResponse } from "../_shared/cors.ts";
 import { getReloadlyBaseUrl, getReloadlyToken } from "../_shared/reloadly-token.ts";
+import { creditAgentKomisyonFromTxId } from "../_shared/credit-agent-komisyon.ts";
 
 /**
  * Envoie une recharge Reloadly (airtime ou data). Réservé aux appels avec la **service role**
@@ -133,6 +134,10 @@ Deno.serve(async (req) => {
         estati: st === "SUCCESSFUL" ? "siksè" : "annatant",
       })
       .eq("id", transactionId);
+
+    if (st === "SUCCESSFUL") {
+      await creditAgentKomisyonFromTxId(supabase, String(transactionId));
+    }
 
     return jsonResponse({
       success: true,

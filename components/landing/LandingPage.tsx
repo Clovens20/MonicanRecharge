@@ -21,8 +21,13 @@ function useOnceIntersecting(ref: RefObject<HTMLElement | null>) {
     if (!el) return;
     const r = el.getBoundingClientRect();
     const vh = window.innerHeight;
-    if (r.top < vh + 200 && r.bottom > -200) setVisible(true);
+    if (r.top < vh + 240 && r.bottom > -240) setVisible(true);
   }, [ref, visible]);
+
+  useEffect(() => {
+    const fallback = window.setTimeout(() => setVisible(true), 2600);
+    return () => window.clearTimeout(fallback);
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -37,7 +42,7 @@ function useOnceIntersecting(ref: RefObject<HTMLElement | null>) {
           }
         }
       },
-      { threshold: 0, rootMargin: "120px 0px 120px 0px" },
+      { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   CheckCircle,
+  XCircle,
   Phone,
   CreditCard,
   Wallet,
@@ -22,7 +23,15 @@ import {
   nationalDigits,
   inferCountryAndNational,
   shouldAutoPickCountryFromPhone,
+  dialForCountry,
 } from "@/lib/reloadly/countries";
+import {
+  validatePhone,
+  effectiveCountryForReloadly,
+  detectOperatorLocally,
+  digitsOnly,
+  PHONE_RULES,
+} from "@/lib/operator-detection";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -63,6 +72,7 @@ export function RechargeForm({
   const [phone, setPhone] = useState("");
   const [operator, setOperator] = useState<Operator | null>(null);
   const [detectingOperator, setDetectingOperator] = useState(false);
+  const [showOperatorOverride, setShowOperatorOverride] = useState(false);
   const [type, setType] = useState<"airtime" | "data_plan">("airtime");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
@@ -95,37 +105,65 @@ export function RechargeForm({
       setKesyeOk(false);
       return;
     }
-    void fetch("/api/kesye/me", { credentials: "include" }).then((r) => setKesyeOk(r.ok));
+    let cancelled = false;
+    void fetch("/api/kesye/me", { credentials: "include" }).then(async (r) => {
+      try {
+        const d = (await r.json()) as { ok?: boolean };
+        if (!cancelled) setKesyeOk(Boolean(d?.ok));
+      } catch {
+        if (!cancelled) setKesyeOk(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   const isStoreUi = pathname?.startsWith("/recharge");
 
-  /** Étape 2 : pays déduit de +33, +509, 00…, ou 509xxxxxxxx (Haïti). Ne remplace pas un pays +1 par un autre (US/CA/DO…). */
+  /** Étape 2 : pays déduit de +33, +509, 00…, NANP 1+10 chiffres, ou 509xxxxxxxx (Haïti). Bascule entre pays +1 (DO / CA / US). */
   useEffect(() => {
     if (step !== 2) return;
     if (!shouldAutoPickCountryFromPhone(phone)) return;
     const tid = window.setTimeout(() => {
       const inferred = inferCountryAndNational(phone);
       if (!inferred || inferred.country.code === country.code) return;
-      if (inferred.country.dial === "+1" && country.dial === "+1") return;
       setCountry(inferred.country);
     }, 180);
     return () => window.clearTimeout(tid);
   }, [phone, step, country.code, country.dial]);
 
-  /** Étape 2 : Haïti = détection locale ; autres pays = Reloadly auto-detect (API) ou mock. */
+  /** Étape 2 : aligne le pays sur DO/CA si le numéro +1 l’impose (sélecteur encore sur US). */
   useEffect(() => {
     if (step !== 2) return;
-    if (country.code === "HT") setDetectingOperator(false);
-    const digits = nationalDigits(phone, country.dial);
+    const clean = digitsOnly(phone);
+    const loc = detectOperatorLocally(clean, country.code);
+    if (!loc.countryOverride || loc.countryOverride === country.code) return;
+    const next = RECHARGE_COUNTRIES.find((c) => c.code === loc.countryOverride);
+    if (!next) return;
+    const tid = window.setTimeout(() => setCountry(next), 160);
+    return () => window.clearTimeout(tid);
+  }, [phone, country.code, step]);
 
-    if (country.code === "HT") {
-      if (digits.length >= 4) setOperator(detectOperator(phone, "HT"));
+  /** Étape 2 : Haïti = détection locale ; autres = API auto-detect avec pays effectif (DO/CA avant Reloadly). */
+  useEffect(() => {
+    if (step !== 2) return;
+    const clean = digitsOnly(phone);
+    const eff = effectiveCountryForReloadly(clean, country.code);
+    const dial = dialForCountry(eff);
+    const digits = nationalDigits(phone, dial);
+
+    if (eff === "HT") {
+      setDetectingOperator(false);
+      setOperator(detectOperator(phone, "HT"));
       return;
     }
 
-    if (digits.length < 7) {
+    const ruleSet = PHONE_RULES[eff];
+    const minDigits = ruleSet ? Math.min(...ruleSet.length) : 7;
+    if (digits.length < minDigits) {
       setOperator(null);
+      setDetectingOperator(false);
       return;
     }
 
@@ -133,27 +171,42 @@ export function RechargeForm({
     const tid = window.setTimeout(async () => {
       setDetectingOperator(true);
       try {
+        const effNow = effectiveCountryForReloadly(digitsOnly(phone), country.code);
         const r = await fetch("/api/reloadly/auto-detect", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: digits, countryCode: country.code }),
+          body: JSON.stringify({ phone: digits, countryCode: effNow }),
           signal: ac.signal,
         });
         const rawText = await r.text();
-        let j: { operator?: { id: number; name: string; logoUrl?: string | null; countryCode?: string } } = {};
+        let j: {
+          operator?: { id: number; name: string; logoUrl?: string | null; countryCode?: string };
+          source?: string;
+          type?: string;
+        } = {};
         try {
           j = JSON.parse(rawText) as typeof j;
         } catch {
           j = {};
         }
 
-        const applyDetected = (id: number, name: string, logoUrl?: string | null) => {
-          const row = RECHARGE_COUNTRIES.find((c) => c.code === country.code);
+        if (j.source === "incomplete") {
+          setOperator(null);
+          return;
+        }
+
+        const applyDetected = (id: number, name: string, logoUrl?: string | null, opCc?: string) => {
+          const cc = opCc || effNow;
+          const row = RECHARGE_COUNTRIES.find((c) => c.code === cc);
+          if (cc !== country.code) {
+            const nc = RECHARGE_COUNTRIES.find((c) => c.code === cc);
+            if (nc) setCountry(nc);
+          }
           setOperator({
             id,
             name,
-            countryCode: country.code,
-            countryName: row?.name || country.code,
+            countryCode: cc,
+            countryName: row?.name || cc,
             flag: row?.flag || "🌍",
             logoUrl: logoUrl || "/operators/orange.svg",
             fxRate: 1,
@@ -164,11 +217,11 @@ export function RechargeForm({
         };
 
         if (j.operator && typeof j.operator.id === "number" && j.operator.name) {
-          applyDetected(j.operator.id, j.operator.name, j.operator.logoUrl);
+          applyDetected(j.operator.id, j.operator.name, j.operator.logoUrl, j.operator.countryCode);
         } else {
-          const local = detectOperator(digits, country.code);
+          const local = detectOperator(digits, effNow);
           if (local) {
-            applyDetected(local.id, local.name, local.logoUrl);
+            applyDetected(local.id, local.name, local.logoUrl, local.countryCode);
           } else {
             setOperator(null);
           }
@@ -183,7 +236,51 @@ export function RechargeForm({
       ac.abort();
       window.clearTimeout(tid);
     };
-  }, [step, phone, country.code, country.dial]);
+  }, [step, phone, country.code]);
+
+  const orderedCountries = useMemo(() => {
+    const PROMINENT = ["HT", "US", "CA", "FR", "DO", "BR"];
+    const head = PROMINENT.map((code) => RECHARGE_COUNTRIES.find((c) => c.code === code)).filter(
+      Boolean,
+    ) as typeof RECHARGE_COUNTRIES;
+    const tail = RECHARGE_COUNTRIES.filter((c) => !PROMINENT.includes(c.code));
+    return [...head, ...tail];
+  }, []);
+
+  const effectiveCountryCode = useMemo(
+    () => effectiveCountryForReloadly(digitsOnly(phone), country.code),
+    [phone, country.code],
+  );
+
+  const nationalPhone = useMemo(
+    () => nationalDigits(phone, dialForCountry(effectiveCountryCode)),
+    [phone, effectiveCountryCode],
+  );
+
+  const phoneValidation = useMemo(
+    () => validatePhone(phone, effectiveCountryCode),
+    [phone, effectiveCountryCode],
+  );
+
+  const unknownHaitiPrefix = useMemo(() => {
+    if (effectiveCountryCode !== "HT") return false;
+    const loc = detectOperatorLocally(digitsOnly(phone), country.code);
+    return Boolean(loc.unknownHaitiPrefix);
+  }, [phone, country.code, effectiveCountryCode]);
+
+  const phoneStep2Ok = phoneValidation.valid && operator !== null;
+
+  const phoneFieldPlaceholder = useMemo(() => {
+    const p: Record<string, string> = {
+      HT: t("form.phone_placeholder"),
+      US: t("form.phone_placeholder_us"),
+      CA: t("form.phone_placeholder_ca"),
+      DO: t("form.phone_placeholder_do"),
+      FR: t("form.phone_placeholder_fr"),
+      BR: t("form.phone_placeholder_br"),
+    };
+    return p[effectiveCountryCode] ?? t("form.phone_placeholder_intl");
+  }, [effectiveCountryCode, t]);
 
   const finalAmount = useMemo(() => {
     if (type === "data_plan" && plan) {
@@ -194,9 +291,6 @@ export function RechargeForm({
     const c = parseFloat(customAmount);
     return isNaN(c) ? 0 : c;
   }, [type, amount, customAmount, plan]);
-
-  const nationalPhone = useMemo(() => nationalDigits(phone, country.dial), [phone, country.dial]);
-  const phoneStep2Ok = country.code === "HT" ? nationalPhone.length >= 4 : nationalPhone.length >= 7;
 
   const filteredPlans = operator ? DATA_PLANS.filter((p) => p.operatorId === operator.id) : [];
 
@@ -229,6 +323,20 @@ export function RechargeForm({
   /** Stripe Checkout via API Next (.env STRIPE_SECRET_KEY) — la recharge part après webhook Stripe. */
   async function startStripeCheckout() {
     if (!operator || !finalAmount) return;
+    let refKòd: string | null = null;
+    try {
+      refKòd = typeof document !== "undefined" ? document.cookie.match(/(?:^|; )monican_ref=([^;]*)/)?.[1] ?? null : null;
+      if (refKòd) refKòd = decodeURIComponent(refKòd).trim();
+    } catch {
+      refKòd = null;
+    }
+    try {
+      const ls = localStorage.getItem("monican_ref");
+      if (ls?.trim()) refKòd = ls.trim();
+    } catch {
+      /* ignore */
+    }
+    const refFinal = (refKòd || agentRefCode || "").trim() || undefined;
     const res = await fetch("/api/recharge/stripe-checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -237,10 +345,11 @@ export function RechargeForm({
         operatorId: operator.id,
         operatorName: operator.name,
         recipientPhone: nationalPhone,
-        countryCode: country.code,
+        countryCode: operator.countryCode,
         amount: finalAmount,
         tip: type === "data_plan" ? "data_plan" : "airtime",
         planId: type === "data_plan" && plan ? plan : undefined,
+        refKod: refFinal,
         ...operatorMetaPayload(),
       }),
     });
@@ -283,7 +392,7 @@ export function RechargeForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           operatorId: operator.id,
-          recipientPhone: { countryCode: country.code, number: nationalDigits(phone, country.dial) },
+          recipientPhone: { countryCode: operator.countryCode, number: nationalPhone },
           amount: finalAmount,
           type,
           planId: plan,
@@ -309,8 +418,8 @@ export function RechargeForm({
         operator: operator.name,
         operator_id: operator.id,
         flag: operator.flag,
-        country_code: country.code,
-        recipient: `${country.dial} ${phone}`,
+        country_code: operator.countryCode,
+        recipient: `${dialForCountry(operator.countryCode)} ${phone}`,
         amount_usd: finalAmount,
         amount_local: finalAmount * operator.fxRate,
         currency: operator.currency,
@@ -546,7 +655,11 @@ export function RechargeForm({
                       value={country.code}
                       onChange={(e) => {
                         const c = RECHARGE_COUNTRIES.find((x) => x.code === e.target.value);
-                        if (c) setCountry(c);
+                        if (c) {
+                          setCountry(c);
+                          setOperator(null);
+                          setShowOperatorOverride(false);
+                        }
                       }}
                       className={cn(
                         "h-12 min-w-[10.5rem] shrink-0 rounded-xl border px-3 text-base font-semibold focus:outline-none focus:ring-4",
@@ -555,26 +668,44 @@ export function RechargeForm({
                           : "border-black/10 bg-white text-brand-ink focus:border-brand-green focus:ring-emerald-100",
                       )}
                     >
-                      {RECHARGE_COUNTRIES.map((c) => (
-                        <option
-                          key={c.code}
-                          value={c.code}
-                          className={L ? "bg-[#0F172A] text-slate-100" : "bg-white text-brand-ink"}
-                          style={
-                            L
-                              ? ({ backgroundColor: "#0F172A", color: "#f1f5f9" } as React.CSSProperties)
-                              : ({ backgroundColor: "#ffffff", color: "#0f172a" } as React.CSSProperties)
-                          }
-                        >
-                          {c.flag} {c.name} · {c.dial}
-                        </option>
-                      ))}
+                      <optgroup label={t("form.country_group_priority")}>
+                        {orderedCountries.slice(0, 6).map((c) => (
+                          <option
+                            key={c.code}
+                            value={c.code}
+                            className={L ? "bg-[#0F172A] text-slate-100" : "bg-white text-brand-ink"}
+                            style={
+                              L
+                                ? ({ backgroundColor: "#0F172A", color: "#f1f5f9" } as React.CSSProperties)
+                                : ({ backgroundColor: "#ffffff", color: "#0f172a" } as React.CSSProperties)
+                            }
+                          >
+                            {c.flag} {c.name} · {c.dial}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label={t("form.country_group_more")}>
+                        {orderedCountries.slice(6).map((c) => (
+                          <option
+                            key={c.code}
+                            value={c.code}
+                            className={L ? "bg-[#0F172A] text-slate-100" : "bg-white text-brand-ink"}
+                            style={
+                              L
+                                ? ({ backgroundColor: "#0F172A", color: "#f1f5f9" } as React.CSSProperties)
+                                : ({ backgroundColor: "#ffffff", color: "#0f172a" } as React.CSSProperties)
+                            }
+                          >
+                            {c.flag} {c.name} · {c.dial}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                     <Input
                       data-testid="phone-input"
                       type="tel"
                       inputMode="tel"
-                      placeholder={country.code === "HT" ? t("form.phone_placeholder") : t("form.phone_placeholder_intl")}
+                      placeholder={phoneFieldPlaceholder}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       autoFocus
@@ -587,30 +718,91 @@ export function RechargeForm({
                   </div>
                   <p className={cn("text-[11px] leading-snug", L ? "text-slate-500" : "text-black/45")}>{t("form.country_auto_hint")}</p>
 
+                  {nationalPhone.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                      {phoneValidation.valid ? (
+                        <CheckCircle weight="fill" className={cn("h-4 w-4 shrink-0", L ? "text-emerald-400" : "text-emerald-600")} />
+                      ) : phoneValidation.partial ? null : (
+                        <XCircle weight="fill" className={cn("h-4 w-4 shrink-0", L ? "text-red-400" : "text-red-600")} />
+                      )}
+                      <span className={L ? "text-slate-400" : "text-black/50"}>
+                        {phoneValidation.valid
+                          ? t("form.phone_length_ok")
+                          : phoneValidation.partial
+                            ? t("form.phone_length_progress")
+                            : t("form.phone_invalid")}
+                      </span>
+                    </div>
+                  ) : null}
+
                   <div className="min-h-[44px]">
-                    {detectingOperator && country.code !== "HT" ? (
+                    {detectingOperator && effectiveCountryCode !== "HT" ? (
                       <div className={cn("text-xs font-medium", L ? "text-slate-400" : "text-black/50")}>{t("form.detecting_operator")}</div>
                     ) : null}
                     {operator && phoneStep2Ok ? (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className={cn(
-                          "flex items-center gap-3 rounded-xl border px-3 py-2 text-sm font-semibold",
-                          L
-                            ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
-                            : "border-emerald-200 bg-emerald-50 text-emerald-700",
-                        )}
-                        data-testid="operator-detected"
-                      >
-                        <CheckCircle weight="fill" className="h-5 w-5" />
-                        {detectedLine(operator)}
-                      </motion.div>
+                      <div className="space-y-2">
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className={cn(
+                            "flex items-center gap-3 rounded-xl border px-3 py-2 text-sm font-semibold",
+                            L
+                              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                          )}
+                          data-testid="operator-detected"
+                        >
+                          <CheckCircle weight="fill" className="h-5 w-5" />
+                          {detectedLine(operator)}
+                        </motion.div>
+                        <button
+                          type="button"
+                          className={cn("text-[11px] font-semibold underline underline-offset-2", L ? "text-slate-400 hover:text-white" : "text-black/50 hover:text-brand-ink")}
+                          onClick={() => setShowOperatorOverride((v) => !v)}
+                        >
+                          {t("form.change_operator")}
+                        </button>
+                        {showOperatorOverride ? (
+                          <div className="flex flex-wrap gap-2">
+                            {OPERATORS.filter((o) => o.countryCode === effectiveCountryCode).map((op) => (
+                              <button
+                                key={op.id}
+                                type="button"
+                                onClick={() => {
+                                  setOperator(op);
+                                  setShowOperatorOverride(false);
+                                }}
+                                className={cn(
+                                  "rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors",
+                                  L ? "border-white/20 bg-white/5 text-slate-200 hover:bg-white/10" : "border-black/10 bg-white hover:border-emerald-400",
+                                )}
+                              >
+                                {op.name}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOperator(null);
+                                setShowOperatorOverride(false);
+                              }}
+                              className={cn(
+                                "rounded-lg border px-2.5 py-1 text-xs font-semibold",
+                                L ? "border-white/15 text-slate-500" : "border-dashed border-black/15 text-black/45",
+                              )}
+                            >
+                              {t("form.operator_other")}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     ) : nationalPhone.length > 0 && !detectingOperator ? (
                       <div className={cn("text-xs", L ? "text-slate-500" : "text-black/40")}>
-                        {phoneStep2Ok && !operator && country.code !== "HT"
-                          ? t("form.operator_not_found")
-                          : `${t("form.detected")}…`}
+                        {unknownHaitiPrefix
+                          ? t("form.operator_unknown_ht")
+                          : phoneValidation.valid && !operator && effectiveCountryCode !== "HT"
+                            ? t("form.operator_not_found")
+                            : `${t("form.detected")}…`}
                       </div>
                     ) : null}
                   </div>
@@ -805,7 +997,7 @@ export function RechargeForm({
             {step === 5 && successTx && (
               <ReceiptSuccessPanel
                 tx={successTx}
-                dial={country.dial}
+                dial={dialForCountry(successTx.country_code || country.code)}
                 nationalDigits={phone.replace(/\D/g, "")}
                 cashierName={cashierForReceipt}
                 onSkip={finishReceiptAndLeave}
@@ -848,7 +1040,7 @@ export function RechargeForm({
                       <div className="flex justify-between">
                         <span className={L ? "text-slate-400" : "text-black/60"}>{t("form.summary_phone")}</span>
                         <span className="font-mono font-semibold">
-                          {country.dial} {phone}
+                          {dialForCountry(operator.countryCode)} {phone}
                         </span>
                       </div>
                       <div className="flex justify-between">

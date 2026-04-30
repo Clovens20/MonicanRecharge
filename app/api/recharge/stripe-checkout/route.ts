@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
@@ -80,6 +81,9 @@ export async function POST(req: Request) {
   const amount = body.amount;
   const tip = (body.tip as string) || "airtime";
   const planId = body.planId as string | undefined;
+  const bodyRef = String((body as { refKod?: string }).refKod || "").trim();
+  const cookieRef = cookies().get("monican_ref")?.value?.trim() || "";
+  const refSan = (bodyRef || cookieRef).replace(/[^A-Za-z0-9\-_]/g, "").slice(0, 48);
 
   if (operatorId == null || !operatorName || !recipientPhone || amount == null) {
     return NextResponse.json({ error: "operatorId, operatorName, recipientPhone et amount requis" }, { status: 400 });
@@ -96,27 +100,48 @@ export async function POST(req: Request) {
   }
 
   const prixVann = Math.ceil(prixKoutaj * 1.08 * 100) / 100;
-  const benefis = prixVann - prixKoutaj;
+  const benefisBrut = prixVann - prixKoutaj;
 
-  const { data: tx, error: insErr } = await svc
-    .from("tranzaksyon")
-    .insert({
-      user_id: user.id,
-      operator_id: operatorIdNum,
-      operatè: String(operatorName),
-      pays_kòd: String(countryCode).toUpperCase().slice(0, 2),
-      nimewo_resevwa: String(recipientPhone),
-      montant_usd: prixVann,
-      pri_koutaj: prixKoutaj,
-      pri_vann: prixVann,
-      benefis,
-      tip: tip || "airtime",
-      plan_id: planId ?? null,
-      mòd_peman: "stripe",
-      estati: "annatant",
-    })
-    .select("id")
-    .single();
+  let ref_kòd: string | null = null;
+  let ajan_id: string | null = null;
+  let komisyon_ajan = 0;
+  let komisyon_pousantaj: number | null = null;
+  if (refSan.length >= 4) {
+    const { data: ag } = await svc.from("ajan").select("user_id, to_komisyon, estati").eq("kòd_ajan", refSan).maybeSingle();
+    if (ag?.estati === "aktif") {
+      const pct = Number(ag.to_komisyon ?? 5);
+      const p = Number.isFinite(pct) && pct > 0 ? pct : 5;
+      ref_kòd = refSan;
+      ajan_id = ag.user_id;
+      komisyon_pousantaj = p;
+      komisyon_ajan = Math.round(prixVann * (p / 100) * 100) / 100;
+    }
+  }
+
+  const benefisNet = Math.round((benefisBrut - komisyon_ajan) * 100) / 100;
+  const insertRow: Record<string, unknown> = {
+    user_id: user.id,
+    operator_id: operatorIdNum,
+    operatè: String(operatorName),
+    pays_kòd: String(countryCode).toUpperCase().slice(0, 2),
+    nimewo_resevwa: String(recipientPhone),
+    montant_usd: prixVann,
+    pri_koutaj: prixKoutaj,
+    pri_vann: prixVann,
+    benefis: benefisNet,
+    tip: tip || "airtime",
+    plan_id: planId ?? null,
+    mòd_peman: "stripe",
+    estati: "annatant",
+  };
+  if (ref_kòd) {
+    insertRow.ref_kòd = ref_kòd;
+    insertRow.ajan_id = ajan_id;
+    insertRow.komisyon_ajan = komisyon_ajan;
+    insertRow.komisyon_pousantaj = komisyon_pousantaj;
+  }
+
+  const { data: tx, error: insErr } = await svc.from("tranzaksyon").insert(insertRow as never).select("id").single();
 
   if (insErr || !tx?.id) {
     return NextResponse.json({ error: insErr?.message ?? "Insert tranzaksyon echwe" }, { status: 500 });
@@ -151,6 +176,7 @@ export async function POST(req: Request) {
         tip: tip || "airtime",
         userId: user.id,
         planId: planId ?? "",
+        refKod: ref_kòd ?? "",
       },
       success_url: `${base}/success?tx=${txId}`,
       cancel_url: `${base}/?cancelled=true`,

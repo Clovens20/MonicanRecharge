@@ -101,22 +101,27 @@ export function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
   }, [user]);
 
   useEffect(() => {
+    if (!path.startsWith("/recharge")) {
+      setKesyeOk(false);
+      return;
+    }
+    let cancelled = false;
     const run = () => {
-      void fetch("/api/kesye/me", { credentials: "include" }).then((r) => setKesyeOk(r.ok));
+      void fetch("/api/kesye/me", { credentials: "include" }).then(async (r) => {
+        try {
+          const d = (await r.json()) as { ok?: boolean };
+          if (!cancelled) setKesyeOk(Boolean(d?.ok));
+        } catch {
+          if (!cancelled) setKesyeOk(false);
+        }
+      });
     };
-    const eager = path.startsWith("/recharge");
-    if (eager) run();
-    const idleId =
-      !eager && typeof requestIdleCallback !== "undefined"
-        ? requestIdleCallback(run, { timeout: 2000 })
-        : null;
-    const timerId = !eager && idleId === null ? window.setTimeout(run, 500) : null;
+    run();
     const onKesye = () => run();
     window.addEventListener("monican-kesye-session", onKesye);
     return () => {
+      cancelled = true;
       window.removeEventListener("monican-kesye-session", onKesye);
-      if (idleId !== null) cancelIdleCallback(idleId);
-      if (timerId !== null) window.clearTimeout(timerId);
     };
   }, [path]);
 

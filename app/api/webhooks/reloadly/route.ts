@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { creditAgentCommissionFromTranzaksyonId } from "@/lib/ajan/creditFromTranzaksyon";
 
 // IPs officielles Reloadly (visibles sur ton dashboard)
 const RELOADLY_IPS = ["54.84.138.60", "54.84.66.109"];
@@ -103,7 +104,6 @@ export async function POST(req: NextRequest) {
   const reloadlyTxId = String(event.transactionId ?? event.id ?? "");
   const customId     = String(event.customIdentifier ?? "");
   const rawStatus    = String(event.status ?? "").toUpperCase();
-  const operatorTxId = String(event.operatorTransactionId ?? "");
 
   if (!reloadlyTxId && !customId) {
     console.warn("[reloadly-webhook] Aucun identifiant dans le payload");
@@ -124,14 +124,11 @@ export async function POST(req: NextRequest) {
     ? customId.replace("MONICAN-", "")
     : null;
 
-  let query = svc
-    .from("tranzaksyon")
-    .update({
-      estati: nouveauStatut,
-      reloadly_transaction_id: reloadlyTxId || null,
-      mesaj_estati: rawStatus,
-      ...(operatorTxId ? { operator_transaction_id: operatorTxId } : {}),
-    });
+  let query = svc.from("tranzaksyon").update({
+    estati: nouveauStatut,
+    reloadly_transaction_id: reloadlyTxId || null,
+    mesaj_estati: rawStatus,
+  });
 
   if (internalId) {
     query = query.eq("id", internalId);
@@ -149,6 +146,19 @@ export async function POST(req: NextRequest) {
   console.log(
     `[reloadly-webhook] ✅ Transaction ${internalId ?? reloadlyTxId} → ${nouveauStatut}`,
   );
+
+  if (nouveauStatut === "siksè") {
+    let txUuid: string | null = internalId;
+    if (!txUuid && reloadlyTxId) {
+      const { data: row } = await svc.from("tranzaksyon").select("id").eq("reloadly_transaction_id", reloadlyTxId).maybeSingle();
+      txUuid = row?.id ? String(row.id) : null;
+    }
+    if (txUuid) {
+      void creditAgentCommissionFromTranzaksyonId(txUuid).catch((e) =>
+        console.warn("[reloadly-webhook] commission:", e instanceof Error ? e.message : e),
+      );
+    }
+  }
 
   // ── 8. Toujours répondre 200 à Reloadly ──────────────────────────────────
   return NextResponse.json({ received: true });

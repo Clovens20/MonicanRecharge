@@ -19,13 +19,16 @@ export default function StoreRechargePage() {
 
   useEffect(() => {
     void fetch("/api/kesye/me", { credentials: "include" }).then(async (r) => {
-      if (!r.ok) return;
-      const d = await r.json();
-      if (d.ok) {
-        setLogged(true);
-        setBoutik(d.non || "");
-        setMustChangeNip(Boolean(d.mustChangeNip));
-        window.dispatchEvent(new Event("monican-kesye-session"));
+      try {
+        const d = (await r.json()) as { ok?: boolean; non?: string; mustChangeNip?: boolean };
+        if (d.ok) {
+          setLogged(true);
+          setBoutik(d.non || "");
+          setMustChangeNip(Boolean(d.mustChangeNip));
+          window.dispatchEvent(new Event("monican-kesye-session"));
+        }
+      } catch {
+        /* ignore */
       }
     });
   }, []);

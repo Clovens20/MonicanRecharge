@@ -1,5 +1,7 @@
 /** Pays / indicatifs pour le sélecteur « Autres pays » (recharge internationale). */
 
+import { inferNanpIsoFromNational10 } from "@/lib/operator-detection";
+
 export type RechargeCountry = { code: string; flag: string; dial: string; name: string };
 
 export const RECHARGE_COUNTRIES: RechargeCountry[] = [
@@ -62,7 +64,7 @@ export function dialForCountry(code: string): string {
 
 /**
  * Devine pays + numéro national à partir du champ (E.164 `+…`, `00…`, ou `509…` pour Haïti).
- * Pour `+1` (NANP), le premier pays listé avec indicatif +1 (US) l’emporte — fine zone impossible sans base NANP.
+ * Pour `+1` (NANP), résolution République dominicaine / Canada / États-Unis selon le code régional (10 chiffres).
  */
 export function inferCountryAndNational(raw: string): { country: RechargeCountry; nationalDigits: string } | null {
   const trimmed = String(raw || "").trim();
@@ -83,6 +85,11 @@ export function inferCountryAndNational(raw: string): { country: RechargeCountry
     if (d.startsWith(dialDigits)) {
       if (dialDigits === "1" && d.length < 11) continue;
       const nat = d.slice(dialDigits.length).replace(/^0+/, "") || "";
+      if (dialDigits === "1" && nat.length >= 10) {
+        const nanpIso = inferNanpIsoFromNational10(nat.slice(0, 10));
+        const picked = RECHARGE_COUNTRIES.find((x) => x.code === nanpIso) || c;
+        return { country: picked, nationalDigits: nat };
+      }
       return { country: c, nationalDigits: nat };
     }
   }
@@ -101,7 +108,10 @@ export function shouldAutoPickCountryFromPhone(raw: string): boolean {
   if (!t) return false;
   if (t.startsWith("+") || t.startsWith("00")) return true;
   const d = t.replace(/\D/g, "");
-  return d.startsWith("509") && d.length >= 11;
+  if (d.startsWith("509") && d.length >= 11) return true;
+  /** NANP 1 + 10 chiffres sans « + » (ex. 1809…) pour basculer DO / CA / US. */
+  if (d.startsWith("1") && d.length === 11) return true;
+  return false;
 }
 
 /** Chiffres nationaux sans indicatif pays (simplifié pour Reloadly auto-detect). */

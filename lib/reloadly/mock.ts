@@ -1,5 +1,7 @@
 // Reloadly mock service — replace with real SDK when RELOADLY_CLIENT_ID/SECRET are set.
 
+import { detectHaiti } from "@/lib/operator-detection";
+
 export type Operator = {
   id: number;
   name: string;
@@ -35,7 +37,7 @@ export const OPERATORS: Operator[] = [
     logoUrl: "/operators/digicel.svg",
     fxRate: 132,
     currency: "HTG",
-    prefixes: ["3", "4"],
+    prefixes: ["34", "37", "38", "46", "47", "48"],
     type: "both",
   },
   {
@@ -47,7 +49,7 @@ export const OPERATORS: Operator[] = [
     logoUrl: "/operators/natcom.svg",
     fxRate: 132,
     currency: "HTG",
-    prefixes: ["32", "33", "36"],
+    prefixes: ["32", "33", "36", "39", "40", "41", "42", "43", "44", "45"],
     type: "both",
   },
   {
@@ -71,6 +73,102 @@ export const OPERATORS: Operator[] = [
     logoUrl: "/operators/tmobile.svg",
     fxRate: 1,
     currency: "USD",
+    prefixes: [],
+    type: "airtime",
+  },
+  {
+    id: 998,
+    name: "Verizon USA",
+    countryCode: "US",
+    countryName: "United States",
+    flag: "🇺🇸",
+    logoUrl: "/operators/att.svg",
+    fxRate: 1,
+    currency: "USD",
+    prefixes: [],
+    type: "airtime",
+  },
+  {
+    id: 997,
+    name: "Rogers Canada",
+    countryCode: "CA",
+    countryName: "Canada",
+    flag: "🇨🇦",
+    logoUrl: "/operators/tmobile.svg",
+    fxRate: 1,
+    currency: "CAD",
+    prefixes: [],
+    type: "airtime",
+  },
+  {
+    id: 996,
+    name: "Bell Canada",
+    countryCode: "CA",
+    countryName: "Canada",
+    flag: "🇨🇦",
+    logoUrl: "/operators/att.svg",
+    fxRate: 1,
+    currency: "CAD",
+    prefixes: [],
+    type: "airtime",
+  },
+  {
+    id: 995,
+    name: "Telus Canada",
+    countryCode: "CA",
+    countryName: "Canada",
+    flag: "🇨🇦",
+    logoUrl: "/operators/orange.svg",
+    fxRate: 1,
+    currency: "CAD",
+    prefixes: [],
+    type: "airtime",
+  },
+  {
+    id: 301,
+    name: "Orange France",
+    countryCode: "FR",
+    countryName: "France",
+    flag: "🇫🇷",
+    logoUrl: "/operators/orange.svg",
+    fxRate: 1,
+    currency: "EUR",
+    prefixes: [],
+    type: "airtime",
+  },
+  {
+    id: 302,
+    name: "SFR France",
+    countryCode: "FR",
+    countryName: "France",
+    flag: "🇫🇷",
+    logoUrl: "/operators/tmobile.svg",
+    fxRate: 1,
+    currency: "EUR",
+    prefixes: [],
+    type: "airtime",
+  },
+  {
+    id: 303,
+    name: "Bouygues Telecom",
+    countryCode: "FR",
+    countryName: "France",
+    flag: "🇫🇷",
+    logoUrl: "/operators/claro.svg",
+    fxRate: 1,
+    currency: "EUR",
+    prefixes: [],
+    type: "airtime",
+  },
+  {
+    id: 304,
+    name: "Free Mobile",
+    countryCode: "FR",
+    countryName: "France",
+    flag: "🇫🇷",
+    logoUrl: "/operators/digicel.svg",
+    fxRate: 1,
+    currency: "EUR",
     prefixes: [],
     type: "airtime",
   },
@@ -122,13 +220,14 @@ export function detectOperator(phone: string, countryCode: string): Operator | n
   const cc = String(countryCode || "").toUpperCase().slice(0, 2);
   const cleaned = phone.replace(/\D/g, "").replace(/^509/, "");
   if (cc === "HT") {
-    const d = cleaned.charAt(0);
-    const d2 = cleaned.slice(0, 2);
-    const natcom = OPERATORS.find((o) => o.id === 528);
-    const digicel = OPERATORS.find((o) => o.id === 173);
-    if (natcom && natcom.prefixes.some((p) => d2.startsWith(p))) return natcom;
-    if (digicel && digicel.prefixes.includes(d)) return digicel;
-    return digicel || null;
+    let loc = cleaned;
+    if (cleaned.startsWith("509")) loc = cleaned.slice(3);
+    loc = loc.replace(/^0+/, "") || loc;
+    if (loc.length < 8) return null;
+    const eight = loc.slice(0, 8);
+    const h = detectHaiti(eight);
+    if (!h?.operatorId) return null;
+    return OPERATORS.find((o) => o.id === h.operatorId) || null;
   }
 
   if (cc === "DO") {
