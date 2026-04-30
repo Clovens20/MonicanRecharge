@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -38,15 +39,19 @@ import { Badge } from "./ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { addTx, TxLocal } from "@/lib/store";
 import { cn, formatCurrency, formatHTG } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { ReceiptSuccessPanel } from "@/components/ReceiptSuccessPanel";
 import { getCashierName } from "@/lib/receipt/caisse";
 import { tryOpenCashDrawer } from "@/lib/receipt/caisse";
+
+const ReceiptSuccessPanel = dynamic(
+  () => import("@/components/ReceiptSuccessPanel").then((m) => m.ReceiptSuccessPanel),
+  { ssr: false },
+);
 
 export function RechargeForm({
   compact = false,
   commissionPct,
   agentRefCode,
+  allowAgentPricing = false,
   visualMode = "default",
   showReceiptPanel = true,
 }: {
@@ -55,11 +60,14 @@ export function RechargeForm({
   commissionPct?: number | null;
   /** Kòd pèsonèl ajan pou atribye komisyon sou vann dirèk (tablo ajan). */
   agentRefCode?: string | null;
+  /** Ajan ka chwazi pri final kliyan an (cash). */
+  allowAgentPricing?: boolean;
   /** Style sombre / glass pour la landing uniquement — logique inchangée. */
   visualMode?: "default" | "landing";
   /** Panel reçus (print / WhatsApp / email) : utile surtout pour caisse/agent. */
   showReceiptPanel?: boolean;
 }) {
+  const MIN_AGENT_PROFIT_USD = 0.5;
   const { t, lang } = useLang();
   const L = visualMode === "landing";
   const router = useRouter();
@@ -78,16 +86,11 @@ export function RechargeForm({
   const [customAmount, setCustomAmount] = useState("");
   const [plan, setPlan] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"stripe" | "cash">("stripe");
+  const [agentSellAmount, setAgentSellAmount] = useState("");
+  const [agentReceiveLocal, setAgentReceiveLocal] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [successTx, setSuccessTx] = useState<TxLocal | null>(null);
   const [cashierForReceipt, setCashierForReceipt] = useState("");
-
-  useEffect(() => {
-    const sb = createClient();
-    if (!sb) return;
-    sb.auth.getUser().then(({ data }) => setUser(data.user));
-  }, []);
 
   useEffect(() => {
     const sync = () => setOnline(navigator.onLine !== false);
@@ -120,6 +123,8 @@ export function RechargeForm({
   }, [pathname]);
 
   const isStoreUi = pathname?.startsWith("/recharge");
+  const isAgentHubUi = pathname?.startsWith("/tableau-de-bord/ajan");
+  const isAgentWalletMode = allowAgentPricing && isAgentHubUi;
 
   /** Étape 2 : pays déduit de +33, +509, 00…, NANP 1+10 chiffres, ou 509xxxxxxxx (Haïti). Bascule entre pays +1 (DO / CA / US). */
   useEffect(() => {
@@ -292,6 +297,47 @@ export function RechargeForm({
     return isNaN(c) ? 0 : c;
   }, [type, amount, customAmount, plan]);
 
+  const canAgentSetPrice = isAgentWalletMode;
+  const effectiveRechargeUsd = useMemo(() => {
+    if (!isAgentWalletMode || !operator) return finalAmount;
+    const htg = parseFloat(agentReceiveLocal);
+    if (!Number.isFinite(htg) || htg <= 0) return finalAmount;
+    const fx = Number(operator.fxRate || 1);
+    if (!Number.isFinite(fx) || fx <= 0) return finalAmount;
+    return Math.round((htg / fx) * 100) / 100;
+  }, [isAgentWalletMode, operator, agentReceiveLocal, finalAmount]);
+
+  const clientPriceAmount = useMemo(() => {
+    if (!canAgentSetPrice) return finalAmount;
+    const p = parseFloat(agentSellAmount);
+    return Number.isFinite(p) ? p : effectiveRechargeUsd;
+  }, [canAgentSetPrice, agentSellAmount, finalAmount, effectiveRechargeUsd]);
+
+  const agentProfitUsd = useMemo(() => {
+    if (!canAgentSetPrice) return 0;
+    return Math.round((clientPriceAmount - effectiveRechargeUsd) * 100) / 100;
+  }, [canAgentSetPrice, clientPriceAmount, effectiveRechargeUsd]);
+
+  useEffect(() => {
+    if (!isAgentWalletMode) return;
+    if (paymentMethod !== "cash") setPaymentMethod("cash");
+  }, [isAgentWalletMode, paymentMethod]);
+
+  useEffect(() => {
+    if (!canAgentSetPrice) return;
+    if (effectiveRechargeUsd <= 0) return;
+    if (!agentSellAmount.trim()) setAgentSellAmount(String(effectiveRechargeUsd));
+  }, [canAgentSetPrice, effectiveRechargeUsd, agentSellAmount]);
+
+  useEffect(() => {
+    if (!isAgentWalletMode || !operator) return;
+    const fx = Number(operator.fxRate || 1);
+    if (!Number.isFinite(fx) || fx <= 0 || finalAmount <= 0) return;
+    if (!agentReceiveLocal.trim()) {
+      setAgentReceiveLocal(String(Math.round(finalAmount * fx)));
+    }
+  }, [isAgentWalletMode, operator, finalAmount, agentReceiveLocal]);
+
   const filteredPlans = operator ? DATA_PLANS.filter((p) => p.operatorId === operator.id) : [];
 
   function detectedLine(op: Operator) {
@@ -371,16 +417,30 @@ export function RechargeForm({
       toast.error("Please complete all steps");
       return;
     }
+    if (canAgentSetPrice) {
+      if (!Number.isFinite(clientPriceAmount) || clientPriceAmount <= 0) {
+        toast.error("Mete yon pri kliyan valab.");
+        return;
+      }
+      if (clientPriceAmount + 0.0001 < effectiveRechargeUsd) {
+        toast.error("Pri kliyan an pa ka pi piti pase valè recharge la.");
+        return;
+      }
+      if (agentProfitUsd + 0.0001 < MIN_AGENT_PROFIT_USD) {
+        toast.error(`Benefis minimòm se ${formatCurrency(MIN_AGENT_PROFIT_USD)}.`);
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       let refKod: string | null = null;
       try {
         refKod = localStorage.getItem("monican_ref");
       } catch {}
-      const refFinal = (refKod || agentRefCode || "").trim() || undefined;
+      const refFinal = isAgentWalletMode ? undefined : (refKod || agentRefCode || "").trim() || undefined;
 
       const isCaisse = Boolean(pathname?.startsWith("/recharge") && kesyeOk);
-      const channelHint = isCaisse ? ("caisse" as const) : undefined;
+      const channelHint = isAgentWalletMode ? ("ajan" as const) : isCaisse ? ("caisse" as const) : undefined;
 
       if (paymentMethod === "stripe") {
         await startStripeCheckout();
@@ -393,11 +453,12 @@ export function RechargeForm({
         body: JSON.stringify({
           operatorId: operator.id,
           recipientPhone: { countryCode: operator.countryCode, number: nationalPhone },
-          amount: finalAmount,
+          amount: effectiveRechargeUsd,
+          sellAmountUsd: canAgentSetPrice ? clientPriceAmount : undefined,
           type,
           planId: plan,
           paymentMethod: "cash",
-          userEmail: user?.email || null,
+          userEmail: null,
           refKod: refFinal,
           channelHint,
           ...operatorMetaPayload(),
@@ -414,14 +475,14 @@ export function RechargeForm({
       const tx: TxLocal = {
         id: data.id,
         reference: data.reference,
-        user_email: user?.email || null,
+        user_email: null,
         operator: operator.name,
         operator_id: operator.id,
         flag: operator.flag,
         country_code: operator.countryCode,
         recipient: `${dialForCountry(operator.countryCode)} ${phone}`,
-        amount_usd: finalAmount,
-        amount_local: finalAmount * operator.fxRate,
+        amount_usd: canAgentSetPrice ? clientPriceAmount : effectiveRechargeUsd,
+        amount_local: effectiveRechargeUsd * operator.fxRate,
         currency: operator.currency,
         type,
         plan: plan ? DATA_PLANS.find((p) => p.id === plan)?.name : null,
@@ -445,6 +506,8 @@ export function RechargeForm({
         setOperator(null);
         setAmount(null);
         setCustomAmount("");
+        setAgentSellAmount("");
+        setAgentReceiveLocal("");
         setPlan(null);
         setStep(1);
       }
@@ -462,6 +525,8 @@ export function RechargeForm({
     setOperator(null);
     setAmount(null);
     setCustomAmount("");
+    setAgentSellAmount("");
+    setAgentReceiveLocal("");
     setPlan(null);
     router.push("/tableau-de-bord");
   }
@@ -1009,7 +1074,7 @@ export function RechargeForm({
               <motion.div key="s4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
                 <div className={cn("text-[11px] font-semibold uppercase tracking-[0.18em]", L ? "text-slate-400" : "text-black/50")}>STEP 4</div>
                 <h3 className={cn("mt-1 text-2xl font-bold tracking-tight", L ? "font-landing-display text-white" : "font-display")}>{t("form.step4")}</h3>
-                {commissionPct != null && commissionPct > 0 ? (
+                {!isAgentWalletMode && commissionPct != null && commissionPct > 0 ? (
                   <div
                     className={cn(
                       "mt-2 rounded-xl border px-3 py-2 text-sm font-semibold",
@@ -1056,13 +1121,53 @@ export function RechargeForm({
                       <div className={cn("mt-2 flex items-end justify-between border-t pt-2", L ? "border-white/10" : "border-black/5")}>
                         <span className={L ? "text-slate-400" : "text-black/60"}>{t("form.summary_total")}</span>
                         <span className={cn("text-2xl font-extrabold tracking-tight", L ? "font-landing-stat text-white" : "font-display")}>
-                          {formatCurrency(finalAmount)}
+                          {formatCurrency(canAgentSetPrice ? clientPriceAmount : effectiveRechargeUsd)}
                         </span>
                       </div>
+                      {canAgentSetPrice ? (
+                        <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                          Valè recharge: <strong>{formatCurrency(effectiveRechargeUsd)}</strong> · Benefis:{" "}
+                          <strong>{formatCurrency(Math.max(agentProfitUsd, 0))}</strong>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className={cn("grid gap-2", isStoreUi ? "grid-cols-2" : "grid-cols-1")}>
+                  {canAgentSetPrice ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800">Sistèm benefis ajan</div>
+                      <Input
+                        className="mt-2 bg-white"
+                        type="number"
+                        step="1"
+                        min={1}
+                        value={agentReceiveLocal}
+                        onChange={(e) => setAgentReceiveLocal(e.target.value)}
+                        placeholder="Kliyan resevwa (HTG)"
+                      />
+                      <Input
+                        className="mt-2 bg-white"
+                        type="number"
+                        step="0.01"
+                        min={effectiveRechargeUsd > 0 ? effectiveRechargeUsd : 0}
+                        value={agentSellAmount}
+                        onChange={(e) => setAgentSellAmount(e.target.value)}
+                        placeholder="Kliyan peye (USD)"
+                      />
+                      <p className="mt-2 text-xs text-emerald-800/90">
+                        Kliyan resevwa ~{formatHTG(effectiveRechargeUsd, operator.fxRate)} {operator.currency} pandan li peye{" "}
+                        {formatCurrency(clientPriceAmount)}. Benefis ou: {formatCurrency(Math.max(agentProfitUsd, 0))}.
+                      </p>
+                      {agentProfitUsd + 0.0001 < MIN_AGENT_PROFIT_USD ? (
+                        <p className="mt-1 text-xs font-semibold text-red-700">
+                          Benefis minimòm obligatwa: {formatCurrency(MIN_AGENT_PROFIT_USD)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {!isAgentWalletMode ? (
+                  <div className={cn("grid gap-2", isStoreUi || isAgentHubUi ? "grid-cols-2" : "grid-cols-1")}>
                     <button
                       type="button"
                       data-testid="pay-stripe"
@@ -1084,7 +1189,7 @@ export function RechargeForm({
                       </div>
                       <div className={cn("text-[10px] uppercase tracking-[0.18em]", L ? "text-slate-500" : "text-black/40")}>Stripe · Visa · Mastercard</div>
                     </button>
-                    {isStoreUi ? (
+                    {isStoreUi || isAgentHubUi ? (
                       <button
                         type="button"
                         data-testid="pay-cash"
@@ -1112,6 +1217,11 @@ export function RechargeForm({
                       </button>
                     ) : null}
                   </div>
+                  ) : (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                      Mòd peman: <strong>Solde ajan</strong> (debite otomatikman sou kont ou).
+                    </div>
+                  )}
 
                   <div className="flex gap-3 pt-1">
                     <Button

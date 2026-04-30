@@ -29,6 +29,15 @@ type Ag = {
 };
 
 type Dem = { id: string; ajan_id: string; montant: number; detay: string; created_at: string };
+type HelpReq = {
+  id: string;
+  ajan_id: string;
+  sijè: string;
+  mesaj: string;
+  estati: "ouvè" | "ankou" | "rezoud" | "fèmen";
+  admin_nòt: string | null;
+  created_at: string;
+};
 
 type AuditTx = {
   id: string;
@@ -57,10 +66,11 @@ type AuditPayload = {
 };
 
 export default function AdminAjanPage() {
-  const [tab, setTab] = useState<"app" | "actif" | "demann" | "kredi">("app");
+  const [tab, setTab] = useState<"app" | "actif" | "demann" | "kredi" | "aide">("app");
   const [apps, setApps] = useState<Apl[]>([]);
   const [agents, setAgents] = useState<Ag[]>([]);
   const [demann, setDemann] = useState<Dem[]>([]);
+  const [helps, setHelps] = useState<HelpReq[]>([]);
   const [pctById, setPctById] = useState<Record<string, string>>({});
   const [forbidden, setForbidden] = useState<"login" | "denied" | null>(null);
   const [resendingUserId, setResendingUserId] = useState<string | null>(null);
@@ -71,18 +81,20 @@ export default function AdminAjanPage() {
   const [krediNòt, setKrediNòt] = useState("");
   const [krediTxId, setKrediTxId] = useState("");
   const [krediSaving, setKrediSaving] = useState(false);
+  const [helpBusyId, setHelpBusyId] = useState<string | null>(null);
 
   async function load() {
-    const [ra, rg, rd] = await Promise.all([
+    const [ra, rg, rd, rh] = await Promise.all([
       fetch("/api/admin/ajan/applications"),
       fetch("/api/admin/ajan/active"),
       fetch("/api/admin/ajan/demandes-peman"),
+      fetch("/api/admin/ajan/help-requests"),
     ]);
     if (ra.status === 401 || rg.status === 401) {
       setForbidden("login");
       return;
     }
-    const [a, g, d] = await Promise.all([ra.json(), rg.json(), rd.json()]);
+    const [a, g, d, h] = await Promise.all([ra.json(), rg.json(), rd.json(), rh.json()]);
     if (a.error === "Forbidden" || g.error === "Forbidden") {
       setForbidden("denied");
       return;
@@ -91,6 +103,7 @@ export default function AdminAjanPage() {
     setApps(a.applications || []);
     setAgents(g.agents || []);
     setDemann(d.demandes || []);
+    setHelps(h.demandes || []);
   }
 
   async function loadKrediAudit(uid: string) {
@@ -226,6 +239,23 @@ export default function AdminAjanPage() {
     load();
   }
 
+  async function setHelpStatus(id: string, estati: "ankou" | "rezoud" | "fèmen") {
+    setHelpBusyId(id);
+    try {
+      const res = await fetch("/api/admin/ajan/help-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, estati }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return toast.error(data.error || "Erè");
+      toast.success("Demann mete ajou.");
+      load();
+    } finally {
+      setHelpBusyId(null);
+    }
+  }
+
   if (forbidden === "login") {
     return (
       <div className="mx-auto max-w-lg px-4 py-24 text-center">
@@ -256,7 +286,7 @@ export default function AdminAjanPage() {
         <p className="mt-1 text-sm text-black/55">Jere aplikasyon, ajan aktif, ak demann peman.</p>
 
         <div className="mt-6 flex flex-wrap gap-2">
-          {(["app", "actif", "demann", "kredi"] as const).map((t) => (
+          {(["app", "actif", "demann", "kredi", "aide"] as const).map((t) => (
             <Button key={t} variant={tab === t ? "green" : "outline"} size="sm" onClick={() => setTab(t)}>
               {t === "app"
                 ? "Aplikasyon"
@@ -264,7 +294,9 @@ export default function AdminAjanPage() {
                   ? "Ajan aktif"
                   : t === "demann"
                     ? "Demann peman"
-                    : "Kredi komisyon"}
+                    : t === "kredi"
+                      ? "Kredi komisyon"
+                      : "Demann èd"}
             </Button>
           ))}
         </div>
@@ -528,6 +560,49 @@ export default function AdminAjanPage() {
                 ) : null}
               </>
             )}
+          </div>
+        )}
+
+        {tab === "aide" && (
+          <div className="mt-8 space-y-3">
+            {helps.map((h) => (
+              <div key={h.id} className="rounded-2xl border border-black/5 bg-white p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-mono text-[11px] text-black/45">{h.ajan_id}</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{h.estati}</div>
+                </div>
+                <div className="mt-2 font-semibold text-brand-ink">{h.sijè}</div>
+                <pre className="mt-2 whitespace-pre-wrap text-xs text-black/70">{h.mesaj}</pre>
+                <div className="mt-2 text-xs text-black/40">{new Date(h.created_at).toLocaleString()}</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={helpBusyId === h.id}
+                    onClick={() => void setHelpStatus(h.id, "ankou")}
+                  >
+                    An kou
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="green"
+                    disabled={helpBusyId === h.id}
+                    onClick={() => void setHelpStatus(h.id, "rezoud")}
+                  >
+                    Rezoud
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={helpBusyId === h.id}
+                    onClick={() => void setHelpStatus(h.id, "fèmen")}
+                  >
+                    Fèmen
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {helps.length === 0 && <p className="text-sm text-black/45">Pa gen demann èd.</p>}
           </div>
         )}
     </section>

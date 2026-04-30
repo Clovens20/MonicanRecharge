@@ -65,6 +65,12 @@ export async function sendCashRechargeViaReloadly(params: {
   }
 
   const prixKoutaj = built.finalAmount;
+  const rawSell = typeof body.sellAmountUsd === "number" ? body.sellAmountUsd : Number.NaN;
+  const prixVann = Number.isFinite(rawSell) && rawSell > 0 ? rawSell : prixKoutaj;
+  if (prixVann + 0.0001 < prixKoutaj) {
+    return { ok: false, error: "Pri vann pa ka pi piti pase pri recharge a.", status: 400 };
+  }
+  const benefis = Math.round((prixVann - prixKoutaj) * 100) / 100;
   const { data: inserted, error: insErr } = await svc
     .from("tranzaksyon")
     .insert({
@@ -73,10 +79,10 @@ export async function sendCashRechargeViaReloadly(params: {
       operatè: op.operator,
       pays_kòd: cc,
       nimewo_resevwa: num,
-      montant_usd: prixKoutaj,
+      montant_usd: prixVann,
       pri_koutaj: prixKoutaj,
-      pri_vann: prixKoutaj,
-      benefis: 0,
+      pri_vann: prixVann,
+      benefis,
       tip,
       plan_id: planIdStr,
       mòd_peman: "cash",
@@ -180,6 +186,8 @@ export async function sendCashRechargeViaReloadly(params: {
     created_at: String(row.created_at || inserted.created_at || new Date().toISOString()),
     mock: false,
     cost_usd: costUsd,
+    amount_usd: prixVann,
+    amount_local: Math.round(prixKoutaj * (channelRecord.amount_local / Math.max(channelRecord.amount_usd, 0.0001))),
   };
 
   return { ok: true, record };

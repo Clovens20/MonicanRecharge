@@ -39,7 +39,8 @@ export default function LoginPage() {
     const nextRaw = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
     const nextSafe =
       nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") && !nextRaw.includes("://") ? nextRaw : null;
-    router.push(nextSafe ? `/auth/konplete?next=${encodeURIComponent(nextSafe)}` : "/auth/konplete");
+    // Si une destination explicite existe (ex: /agent), on évite l'étape /auth/konplete pour accélérer l'UX.
+    router.push(nextSafe || "/auth/konplete");
   }
 
   async function handleGoogle() {

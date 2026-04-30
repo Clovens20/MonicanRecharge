@@ -13,12 +13,14 @@ export type RechargeBody = {
   paymentMethod?: "stripe" | "moncash" | "cash";
   userEmail?: string | null;
   /** Lè vann depi tablo kès (tablèt). */
-  channelHint?: "caisse" | "online";
+  channelHint?: "caisse" | "online" | "ajan";
   /** Opérateur détecté Reloadly absent du mock `OPERATORS`. */
   operatorDisplayName?: string;
   operatorCurrency?: string;
   operatorFxRate?: number;
   operatorLogoUrl?: string | null;
+  /** Prix final payé par le client (utile pour agent/revendeur en cash). */
+  sellAmountUsd?: number | null;
 };
 
 export type RechargeRecord = {
@@ -103,9 +105,11 @@ export function buildRechargeFromBody(
   const reference = genRef();
   const dial = dialForCountry(cc);
   const pay = body.paymentMethod ?? "stripe";
-  const channel: RechargeRecord["channel"] = refKod
+  const channel: RechargeRecord["channel"] = body.channelHint === "ajan"
     ? "ajan"
-    : body.channelHint === "caisse"
+    : refKod
+      ? "ajan"
+      : body.channelHint === "caisse"
       ? "caisse"
       : pay === "moncash"
         ? "moncash_manual"

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Vin Ajan Recharge Monican — recharge.monican.shop",
@@ -17,7 +19,18 @@ const benefits = [
   "Soutyen dirèk WhatsApp",
 ];
 
-export default function AjanLandingPage() {
+export default async function AjanLandingPage() {
+  const sb = createClient();
+  if (sb) {
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    if (user?.id) {
+      const { data: ag } = await sb.from("ajan").select("user_id").eq("user_id", user.id).maybeSingle();
+      if (ag?.user_id) redirect("/agent");
+    }
+  }
+
   return (
     <main className="min-h-screen bg-brand-bg">
       <Navbar mode="agent" />

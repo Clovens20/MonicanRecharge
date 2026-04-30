@@ -4,14 +4,32 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { RechargeForm } from "@/components/RechargeForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { Copy, ShareNetwork } from "@phosphor-icons/react";
+import { Copy, List, ShareNetwork } from "@phosphor-icons/react";
 import { formatCurrency } from "@/lib/utils";
+
+const RechargeForm = dynamic(
+  () => import("@/components/RechargeForm").then((m) => m.RechargeForm),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm text-black/50">
+        Chajman fòm recharge...
+      </div>
+    ),
+  },
+);
 
 type Agent = {
   kòd_ajan: string;
@@ -40,11 +58,17 @@ type Line = {
 };
 
 export default function AjanDashboardPage() {
+  const router = useRouter();
   const [agent, setAgent] = useState<Agent | null>(undefined);
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<Line[]>([]);
-  const [payoutDetay, setPayoutDetay] = useState("");
-  const [payoutMontant, setPayoutMontant] = useState("");
+  const [helpSubject, setHelpSubject] = useState("");
+  const [helpMessage, setHelpMessage] = useState("");
+  const [helpLoading, setHelpLoading] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("");
+  const [topupMethod, setTopupMethod] = useState("Moncash");
+  const [topupRef, setTopupRef] = useState("");
+  const [topupLoading, setTopupLoading] = useState(false);
 
   const baseUrl = useMemo(() => {
     if (typeof window !== "undefined") return window.location.origin;
@@ -93,28 +117,61 @@ export default function AjanDashboardPage() {
     }
   }
 
+  function voirSolde() {
+    const b = stats?.balansAnnatant ?? agent?.balans_komisyon ?? 0;
+    toast.success(`Solde ajan ou: ${formatCurrency(Number(b || 0))}`, { duration: 5000 });
+  }
+
   function shareWa() {
     if (!refUrl) return;
     const t = encodeURIComponent(`Egzanp lyen Monican Recharge: ${refUrl}`);
     window.open(`https://wa.me/?text=${t}`, "_blank");
   }
 
-  async function mandePeman() {
-    const m = parseFloat(payoutMontant);
-    if (!payoutDetay.trim() || !Number.isFinite(m) || m <= 0) {
-      toast.error("Ranpli montant ak detay (Moncash # oswa bank)");
+  async function mandeEd() {
+    if (!helpSubject.trim() || !helpMessage.trim()) {
+      toast.error("Mete sijè ak mesaj la.");
       return;
     }
-    const res = await fetch("/api/ajan/payout-request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ montant: m, detay: payoutDetay }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return toast.error(data.error || "Erè");
-    toast.success("Demann anrejistre");
-    setPayoutDetay("");
-    setPayoutMontant("");
+    setHelpLoading(true);
+    try {
+      const res = await fetch("/api/ajan/help-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sijè: helpSubject, mesaj: helpMessage }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return toast.error(data.error || "Erè");
+      toast.success("Demann èd voye bay admin.");
+      setHelpSubject("");
+      setHelpMessage("");
+    } finally {
+      setHelpLoading(false);
+    }
+  }
+
+  async function mandeRechargeKont() {
+    const amount = parseFloat(topupAmount.replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Mete montan valab pou rechaj kont la.");
+      return;
+    }
+    setTopupLoading(true);
+    try {
+      const res = await fetch("/api/ajan/topup/stripe-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountUsd: amount,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return toast.error(data.error || "Erè");
+      if (!data.url) return toast.error("Stripe URL pa jwenn");
+      window.location.assign(data.url);
+    } finally {
+      setTopupLoading(false);
+    }
   }
 
   if (agent === undefined) {
@@ -157,9 +214,37 @@ export default function AjanDashboardPage() {
             <h1 className="font-display mt-2 text-3xl font-black tracking-tight sm:text-4xl">Bon retou, {agent.kòd_ajan}</h1>
             <p className="mt-1 text-sm text-black/55">Komisyon ou: {agent.to_komisyon}% sou lavant atravè lyen ou.</p>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/tableau-de-bord">Tablo prensipal</Link>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <List className="h-4 w-4" /> Menu
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <a href="#recharge-agent">Recharge kliyan</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href="#topup-agent">Rechaje kont marchand</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href="#lyen-agent">Lyen referans</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={voirSolde}>Konsilte solde ajan</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href="#ed-agent">Sipò / Èd</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href="#istwa-agent">Istwa komisyon</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/ajan/byenveni?premye=1">Chanje modpas</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/tableau-de-bord">Tablo prensipal</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {stats && (
@@ -173,7 +258,7 @@ export default function AjanDashboardPage() {
         )}
 
         <div className="mt-10 grid gap-8 lg:grid-cols-2">
-          <div className="rounded-3xl border border-black/5 bg-white p-6">
+          <div id="lyen-agent" className="rounded-3xl border border-black/5 bg-white p-6">
             <h2 className="font-display text-lg font-bold text-brand-ink">Lyen pèsonèl ou</h2>
             <p className="mt-1 text-xs text-black/50">Chak moun ki itilize lyen sa → ou gen komisyon.</p>
             <div className="mt-4 break-all rounded-2xl bg-brand-bg p-3 font-mono text-xs text-brand-ink">{refUrl}</div>
@@ -193,36 +278,92 @@ export default function AjanDashboardPage() {
           </div>
 
           <div className="rounded-3xl border border-black/5 bg-white p-6">
-            <h2 className="font-display text-lg font-bold text-brand-ink">Mande peman komisyon</h2>
-            <p className="mt-1 text-xs text-black/50">Balans: {formatCurrency(stats?.balansAnnatant || 0)}</p>
-            <Input
-              className="mt-3"
-              placeholder="Montan USD"
-              type="number"
-              value={payoutMontant}
-              onChange={(e) => setPayoutMontant(e.target.value)}
-            />
-            <textarea
-              className="mt-2 min-h-[80px] w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-              placeholder="Moncash # oswa bank (non, nimewo kont...)"
-              value={payoutDetay}
-              onChange={(e) => setPayoutDetay(e.target.value)}
-            />
-            <Button type="button" variant="green" className="mt-3" onClick={mandePeman}>
-              Mande peman
-            </Button>
+            <h2 className="font-display text-lg font-bold text-brand-ink">Aksyon rapid</h2>
+            <p className="mt-1 text-xs text-black/50">Aksè dirèk pou jere kont ajan ou.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="#recharge-agent">Recharge kliyan</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href="#topup-agent">Rechaje kont marchand</a>
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={voirSolde}>
+                Konsilte solde ajan
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="#ed-agent">Sipò / Èd</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/ajan/byenveni?premye=1">Chanje modpas</Link>
+              </Button>
+              <Button asChild variant="green" size="sm">
+                <a href="#recharge-agent">Fè recharge kliyan</a>
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="mt-10">
+        <div id="recharge-agent" className="mt-10">
           <h2 className="font-display text-lg font-bold text-brand-ink">Recharge rapid (kòm ajan)</h2>
           <p className="mt-1 text-xs text-black/50">Ou fè {agent.to_komisyon}% sou chak vann.</p>
           <div className="mt-4 max-w-xl">
-            <RechargeForm commissionPct={Number(agent.to_komisyon)} agentRefCode={agent.kòd_ajan} />
+            <RechargeForm
+              commissionPct={Number(agent.to_komisyon)}
+              agentRefCode={agent.kòd_ajan}
+              allowAgentPricing
+            />
           </div>
         </div>
 
-        <div className="mt-12 rounded-3xl border border-black/5 bg-white p-6">
+        <div id="ed-agent" className="mt-10 rounded-3xl border border-black/5 bg-white p-6">
+          <h2 className="font-display text-lg font-bold text-brand-ink">Mande èd admin</h2>
+          <p className="mt-1 text-xs text-black/50">
+            Si gen pwoblèm sou kredi, tranzaksyon, oswa aksè, voye yon demann isit la. Admin ap wè l nan panel li.
+          </p>
+          <Input
+            className="mt-3"
+            placeholder="Sijè (eg. Kredi pa antre)"
+            value={helpSubject}
+            onChange={(e) => setHelpSubject(e.target.value)}
+          />
+          <textarea
+            className="mt-2 min-h-[100px] w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
+            placeholder="Dekri pwoblèm nan ak detay..."
+            value={helpMessage}
+            onChange={(e) => setHelpMessage(e.target.value)}
+          />
+          <Button type="button" variant="green" className="mt-3" disabled={helpLoading} onClick={mandeEd}>
+            {helpLoading ? "Voye..." : "Voye demann èd"}
+          </Button>
+        </div>
+
+        <div id="topup-agent" className="mt-10 rounded-3xl border border-black/5 bg-white p-6">
+          <h2 className="font-display text-lg font-bold text-brand-ink">Rechaje kont marchand</h2>
+          <p className="mt-1 text-xs text-black/50">
+            Peye ak kat debit/kredi. Si peman an reyisi, sistèm nan ajoute kredi a otomatikman sou solde ajan ou.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <Input
+              type="number"
+              step="0.01"
+              min="1"
+              placeholder="Montan USD"
+              value={topupAmount}
+              onChange={(e) => setTopupAmount(e.target.value)}
+            />
+            <Input value="Card (Stripe)" readOnly className="bg-black/5 text-sm" />
+            <Input
+              placeholder="Nòt (opsyonèl)"
+              value={topupRef}
+              onChange={(e) => setTopupRef(e.target.value)}
+            />
+          </div>
+          <Button type="button" variant="green" className="mt-3" disabled={topupLoading} onClick={mandeRechargeKont}>
+            {topupLoading ? "Tanpri tann..." : "Peye epi rechaje kont otomatikman"}
+          </Button>
+        </div>
+
+        <div id="istwa-agent" className="mt-12 rounded-3xl border border-black/5 bg-white p-6">
           <h2 className="font-display text-lg font-bold text-brand-ink">Istwa komisyon</h2>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">

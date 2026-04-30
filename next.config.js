@@ -6,7 +6,6 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: "/agent", destination: "/ajan", permanent: false },
       { source: "/admin/rapò", destination: "/admin/rapo", permanent: true },
       { source: "/admin/itilizatè", destination: "/admin/itilizate", permanent: true },
     ];
