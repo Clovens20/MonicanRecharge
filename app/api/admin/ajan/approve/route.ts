@@ -7,6 +7,15 @@ import { findAuthUserIdByEmail, isInviteEmailAlreadyRegisteredError } from "@/li
 
 type Body = { aplasyonId?: string; toKomisyon?: number };
 
+function resolvePublicAppUrl(req: Request): string {
+  const app = (process.env.NEXT_PUBLIC_APP_URL || "").trim().replace(/\/$/, "");
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
+  const isLocal = (u: string) => /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(u);
+  if (app && !isLocal(app)) return app;
+  if (site && !isLocal(site)) return site;
+  return new URL(req.url).origin.replace(/\/$/, "");
+}
+
 async function sendResendHtml(to: string, subject: string, html: string) {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
@@ -54,9 +63,9 @@ export async function POST(req: Request) {
   const svc = getServiceSupabase();
   if (!svc) return NextResponse.json({ error: "SERVICE_ROLE manke" }, { status: 503 });
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = resolvePublicAppUrl(req);
   if (!appUrl) {
-    return NextResponse.json({ error: "NEXT_PUBLIC_APP_URL manke (pou lyen envitasyon)" }, { status: 503 });
+    return NextResponse.json({ error: "URL piblik la manke (pou lyen envitasyon)" }, { status: 503 });
   }
 
   const { data: apl, error: e1 } = await svc.from("aplasyon_ajan").select("*").eq("id", aplasyonId).maybeSingle();

@@ -11,6 +11,16 @@ function createTemporaryPassword(): string {
   return `Aa1!${base}`;
 }
 
+function resolvePublicAppUrl(req: Request): string {
+  const app = (process.env.NEXT_PUBLIC_APP_URL || "").trim().replace(/\/$/, "");
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
+  const isLocal = (u: string) => /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(u);
+  if (app && !isLocal(app)) return app;
+  if (site && !isLocal(site)) return site;
+  const origin = new URL(req.url).origin.replace(/\/$/, "");
+  return origin;
+}
+
 export async function POST(req: Request) {
   const sb = createClient();
   if (!sb) return NextResponse.json({ error: "Supabase" }, { status: 503 });
@@ -34,9 +44,9 @@ export async function POST(req: Request) {
   const svc = getServiceSupabase();
   if (!svc) return NextResponse.json({ error: "SERVICE_ROLE manke" }, { status: 503 });
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = resolvePublicAppUrl(req);
   if (!appUrl) {
-    return NextResponse.json({ error: "NEXT_PUBLIC_APP_URL manke" }, { status: 503 });
+    return NextResponse.json({ error: "URL piblik la manke" }, { status: 503 });
   }
 
   const { data: ajanRow, error: eAjan } = await svc.from("ajan").select("user_id").eq("user_id", userId).maybeSingle();
