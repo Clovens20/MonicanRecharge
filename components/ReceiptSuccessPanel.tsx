@@ -14,6 +14,7 @@ import {
   monicanDisplayId,
   maskRecipientForReceipt,
   paymentLabel,
+  type ReceiptVariant,
   type ReceiptWhatsAppPayload,
 } from "@/lib/receipt/caisse";
 import { formatHTG } from "@/lib/utils";
@@ -26,9 +27,11 @@ type Props = {
   nationalDigits: string;
   cashierName: string;
   onSkip: () => void;
+  /** `ajan` : resè revandè (pa nimewo Monican nan pye resè a). */
+  receiptVariant?: ReceiptVariant;
 };
 
-export function ReceiptSuccessPanel({ tx, dial, nationalDigits, cashierName, onSkip }: Props) {
+export function ReceiptSuccessPanel({ tx, dial, nationalDigits, cashierName, onSkip, receiptVariant = "caisse" }: Props) {
   const { t, lang } = useLang();
   const [waOpen, setWaOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -62,7 +65,7 @@ export function ReceiptSuccessPanel({ tx, dial, nationalDigits, cashierName, onS
       paymentLabel: paymentLabel(tx.payment_method, lang),
       txId: monicanDisplayId(tx.reference),
     };
-    const text = encodeURIComponent(buildWhatsAppReceiptMessage(payload));
+    const text = encodeURIComponent(buildWhatsAppReceiptMessage(payload, receiptVariant));
     const n = waDigits.replace(/\D/g, "");
     if (n.length < 8) {
       toast.error(t("receipt.wa_invalid"));
@@ -111,6 +114,7 @@ export function ReceiptSuccessPanel({ tx, dial, nationalDigits, cashierName, onS
           paymentMethod: tx.payment_method,
           createdAt: tx.created_at,
           cashierName: cashierName || "—",
+          receiptVariant,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -140,7 +144,14 @@ export function ReceiptSuccessPanel({ tx, dial, nationalDigits, cashierName, onS
         <p className="mt-1 text-sm text-black/55">{t("receipt.subtitle")}</p>
       </div>
 
-      <ThermalReceipt tx={tx} dial={dial} nationalDigits={nationalDigits} cashierName={cashierName} lang={lang} />
+      <ThermalReceipt
+        tx={tx}
+        dial={dial}
+        nationalDigits={nationalDigits}
+        cashierName={cashierName}
+        lang={lang}
+        variant={receiptVariant}
+      />
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Button type="button" variant="outline" className="h-12 justify-start gap-2 border-black/15" onClick={handlePrint} data-testid="receipt-print">

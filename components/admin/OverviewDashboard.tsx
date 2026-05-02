@@ -31,6 +31,8 @@ type Overview = {
   agents: number;
   moncashPending: number;
   pendingAjanApps: number;
+  /** Sòm `balans_komisyon` ajan aktif (komisyon + prepaid) — pa menm bagay ke balans Reloadly. */
+  totalAgentBalansKomisyonUsd?: number;
 };
 
 export function OverviewDashboard() {
@@ -86,6 +88,11 @@ export function OverviewDashboard() {
                 label="🟢 Reloadly balans"
                 value={ov ? formatCurrency(ov.reloadly) : "—"}
                 alert={ov?.reloadlyLow ? `⚠️ Balans ba! (sou ${formatCurrency(ov.reloadlyMinAlert)})` : undefined}
+              />
+              <Stat
+                label="🤝 Sòm balans ajan (aktif)"
+                value={ov != null ? formatCurrency(ov.totalAgentBalansKomisyonUsd ?? 0) : "—"}
+                hint="Komisyon + kredi prepaid. Lè ajan voye yon recharge, solde ajan bese epi Reloadly bese (API)."
               />
               <Stat label="👥 Kliyan aktif (~30j)" value={ov ? String(ov.customers) : "—"} />
               <Stat label="🤝 Ajan aktif" value={ov ? String(ov.agents) : "—"} />
@@ -166,24 +173,32 @@ export function OverviewDashboard() {
           </div>
         )}
 
-        <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <strong>Reloadly</strong> — mete <code className="rounded bg-white/80 px-1">RELOADLY_BALANCE_USD</code> ak{" "}
-          <code className="rounded bg-white/80 px-1">RELOADLY_MIN_ALERT_USD</code> nan .env. Cron:{" "}
-          <code className="rounded bg-white/80 px-1">/api/cron/verify-reloadly-balance</code>. Lénk biznis:{" "}
-          <a className="font-semibold underline" href="https://www.reloadly.com" target="_blank" rel="noreferrer">
-            Recharje sou Reloadly →
-          </a>
+        <div className="mt-8 space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p>
+            <strong>Ajan ki achte kredi marchand (Stripe)</strong> : lajan antre nan kont Stripe Monican.{" "}
+            <strong>Reloadly pa diminye</strong> nan moman acha a — li diminye lè yon recharge voye atravè API a (balans
+            ajan an retire kò a anvan voye a, epi Reloadly konsome lè tranfer la fèt).
+          </p>
+          <p>
+            <strong>Reloadly</strong> — mete <code className="rounded bg-white/80 px-1">RELOADLY_BALANCE_USD</code> ak{" "}
+            <code className="rounded bg-white/80 px-1">RELOADLY_MIN_ALERT_USD</code> nan .env. Cron:{" "}
+            <code className="rounded bg-white/80 px-1">/api/cron/verify-reloadly-balance</code>. Lénk biznis:{" "}
+            <a className="font-semibold underline" href="https://www.reloadly.com" target="_blank" rel="noreferrer">
+              Recharje sou Reloadly →
+            </a>
+          </p>
         </div>
       </div>
     </main>
   );
 }
 
-function Stat({ label, value, alert }: { label: string; value: string; alert?: string }) {
+function Stat({ label, value, alert, hint }: { label: string; value: string; alert?: string; hint?: string }) {
   return (
     <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">{label}</div>
       <div className="font-display mt-1 text-xl font-extrabold tracking-tight text-brand-ink">{value}</div>
+      {hint ? <p className="mt-2 text-[11px] leading-snug text-black/50">{hint}</p> : null}
       {alert ? <div className="mt-2 text-xs font-semibold text-red-600">{alert}</div> : null}
     </div>
   );

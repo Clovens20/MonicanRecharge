@@ -19,6 +19,8 @@ type Body = {
   paymentMethod?: string;
   createdAt?: string;
   cashierName?: string;
+  /** `ajan` : resè revandè, san nimewo WhatsApp Monican. */
+  receiptVariant?: "caisse" | "ajan";
 };
 
 export async function POST(req: Request) {
@@ -58,13 +60,18 @@ export async function POST(req: Request) {
   const pay = esc(body.paymentMethod || "—");
   const caiss = esc(body.cashierName || "—");
   const when = esc(body.createdAt ? new Date(body.createdAt).toLocaleString("fr-FR") : "—");
+  const isAjan = body.receiptVariant === "ajan";
+  const roleLabel = isAjan ? "Ajan" : "Caissier";
+  const footerLine = isAjan
+    ? "Merci / Mèsi — monican.shop"
+    : "Merci / Mèsi — monican.shop — WhatsApp 717-880-1479";
 
   const html = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px;">
-  <h1 style="font-size:18px;">MONICAN RECHARGE</h1>
+  <h1 style="font-size:18px;">MONICAN RECHARGE${isAjan ? " <span style=\"font-size:14px;color:#555;\">(ajan)</span>" : ""}</h1>
   <p style="color:#555;font-size:14px;">recharge.monican.shop</p>
   <hr/>
   <p><strong>Date</strong> : ${when}</p>
-  <p><strong>Caissier</strong> : ${caiss}</p>
+  <p><strong>${roleLabel}</strong> : ${caiss}</p>
   <p><strong>Réf.</strong> : ${ref}</p>
   <hr/>
   <p><strong>Destinataire</strong><br/>${rec}</p>
@@ -75,7 +82,7 @@ export async function POST(req: Request) {
   <p><strong>Paiement</strong> : ${pay}</p>
   <hr/>
   <p style="color:#059669;font-weight:bold;">✅ Transaction réussie</p>
-  <p style="font-size:13px;color:#555;">Merci / Mèsi — monican.shop — WhatsApp 717-880-1479</p>
+  <p style="font-size:13px;color:#555;">${esc(footerLine)}</p>
   </body></html>`;
 
   const res = await fetch("https://api.resend.com/emails", {

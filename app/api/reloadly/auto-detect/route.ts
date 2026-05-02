@@ -38,7 +38,8 @@ export async function POST(req: Request) {
     );
   }
 
-  if (effectiveCc === "HT") {
+  /** Haïti : IDs mock (528/173) pa toujou matche katalog Reloadly live — itilize API lè kredansyèl yo prezàn. */
+  if (effectiveCc === "HT" && !getReloadlyCredentials()) {
     const mockOp = detectOperator(phoneDigits, "HT");
     return NextResponse.json({ operator: mockOp, source: "mock" as const });
   }
@@ -47,6 +48,11 @@ export async function POST(req: Request) {
   const phoneCandidates = (() => {
     const d = phoneDigits.replace(/\D/g, "");
     const list = [phoneDigits, d];
+    if (effectiveCc === "HT") {
+      if (d.length === 8) list.push(`509${d}`);
+      if (d.length === 8) list.push(`+509${d}`);
+      if (d.length === 11 && d.startsWith("509")) list.push(d, `+${d}`);
+    }
     if (nanpIso.has(effectiveCc) && d.length === 10 && !d.startsWith("1")) {
       list.push(`1${d}`);
     }
@@ -89,6 +95,14 @@ export async function POST(req: Request) {
     } catch (e) {
       console.warn("reloadly auto-detect:", e instanceof Error ? e.message : e);
     }
+  }
+
+  if (effectiveCc === "HT" && getReloadlyCredentials()) {
+    return NextResponse.json({
+      operator: null,
+      error: "Reloadly pa t detekte operatè HT — verifye kle API, nimewo a, oswa otorizasyon operatè a sou kont Reloadly.",
+      source: "reloadly_failed" as const,
+    });
   }
 
   const mockOp = detectOperator(phoneDigits, effectiveCc);

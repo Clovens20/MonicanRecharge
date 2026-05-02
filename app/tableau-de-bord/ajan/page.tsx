@@ -19,17 +19,14 @@ import { toast } from "sonner";
 import { Copy, List, ShareNetwork } from "@phosphor-icons/react";
 import { formatCurrency } from "@/lib/utils";
 
-const RechargeForm = dynamic(
-  () => import("@/components/RechargeForm").then((m) => m.RechargeForm),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm text-black/50">
-        Chajman fòm recharge...
-      </div>
-    ),
-  },
-);
+const RechargeForm = dynamic(() => import("@/components/RechargeForm"), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm text-black/50">
+      Chajman fòm recharge...
+    </div>
+  ),
+});
 
 type Agent = {
   kòd_ajan: string;
@@ -60,6 +57,8 @@ type Line = {
 export default function AjanDashboardPage() {
   const router = useRouter();
   const [agent, setAgent] = useState<Agent | null>(undefined);
+  const [loadTick, setLoadTick] = useState(0);
+  const [bootNetworkError, setBootNetworkError] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<Line[]>([]);
   const [helpSubject, setHelpSubject] = useState("");
@@ -81,21 +80,38 @@ export default function AjanDashboardPage() {
     : "";
 
   useEffect(() => {
+    let cancelled = false;
+    setBootNetworkError(false);
     (async () => {
-      const r = await fetch("/api/ajan/me");
-      const me = await r.json();
-      if (r.status === 401 || !me.agent) {
-        setAgent(null);
-        return;
-      }
-      setAgent(me.agent);
-      const st = await fetch("/api/ajan/stats").then((x) => x.json());
-      if (st.stats) {
-        setStats(st.stats);
-        setRecent(st.recent || []);
+      try {
+        const [rMe, rSt] = await Promise.all([
+          fetch("/api/ajan/me", { cache: "no-store" }),
+          fetch("/api/ajan/stats", { cache: "no-store" }),
+        ]);
+        const me = await rMe.json().catch(() => ({}));
+        if (cancelled) return;
+        if (rMe.status === 401 || !me.agent) {
+          setAgent(null);
+          return;
+        }
+        setAgent(me.agent);
+        const st = await rSt.json().catch(() => ({}));
+        if (cancelled) return;
+        if (rSt.ok && st.stats) {
+          setStats(st.stats);
+          setRecent(st.recent || []);
+        }
+      } catch {
+        if (!cancelled) {
+          setBootNetworkError(true);
+          toast.error("Pa ka chaje tablo a. Verifye koneksyon ou.");
+        }
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [loadTick]);
 
   useEffect(() => {
     if (agent === undefined || agent === null) return;
@@ -174,6 +190,22 @@ export default function AjanDashboardPage() {
     }
   }
 
+  if (bootNetworkError) {
+    return (
+      <main className="min-h-screen bg-brand-bg">
+        <Navbar mode="agent" />
+        <section className="mx-auto max-w-lg px-4 py-24 text-center">
+          <h1 className="font-display text-xl font-bold text-brand-ink">Pa ka chaje done yo</h1>
+          <p className="mt-2 text-sm text-black/55">Verifye entènèt ou, epi eseye ankò.</p>
+          <Button type="button" variant="green" className="mt-6" onClick={() => setLoadTick((n) => n + 1)}>
+            Eseye ankò
+          </Button>
+        </section>
+        <Footer />
+      </main>
+    );
+  }
+
   if (agent === undefined) {
     return (
       <main className="min-h-screen bg-brand-bg">
@@ -238,6 +270,9 @@ export default function AjanDashboardPage() {
                 <a href="#istwa-agent">Istwa komisyon</a>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
+                <Link href="/tableau-de-bord/ajan/tranzaksyon">Tranzaksyon recharge voye</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
                 <Link href="/ajan/byenveni?premye=1">Chanje modpas</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -295,6 +330,9 @@ export default function AjanDashboardPage() {
               </Button>
               <Button asChild variant="outline" size="sm">
                 <Link href="/ajan/byenveni?premye=1">Chanje modpas</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/tableau-de-bord/ajan/tranzaksyon">Tranzaksyon voye yo</Link>
               </Button>
               <Button asChild variant="green" size="sm">
                 <a href="#recharge-agent">Fè recharge kliyan</a>

@@ -1,6 +1,6 @@
 /**
  * Détection opérateur / pays NANP **avant** Reloadly — Haïti 100 % local, DO/CA prioritaires sur US pour +1.
- * Les IDs opérateur Haïti / mock doivent rester alignés sur Reloadly en production.
+ * IDs mock HT (173/528) : fallback dev sèlman ; an prod `auto-detect` itilize Reloadly API pou ID reyèl.
  */
 
 export interface OperatorResult {

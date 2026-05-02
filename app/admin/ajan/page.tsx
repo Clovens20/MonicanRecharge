@@ -82,19 +82,22 @@ export default function AdminAjanPage() {
   const [krediTxId, setKrediTxId] = useState("");
   const [krediSaving, setKrediSaving] = useState(false);
   const [helpBusyId, setHelpBusyId] = useState<string | null>(null);
+  const [topupNotifyOn, setTopupNotifyOn] = useState(false);
+  const [topupNotifySaving, setTopupNotifySaving] = useState(false);
 
   async function load() {
-    const [ra, rg, rd, rh] = await Promise.all([
+    const [ra, rg, rd, rh, rn] = await Promise.all([
       fetch("/api/admin/ajan/applications"),
       fetch("/api/admin/ajan/active"),
       fetch("/api/admin/ajan/demandes-peman"),
       fetch("/api/admin/ajan/help-requests"),
+      fetch("/api/admin/ajan-topup-notify"),
     ]);
     if (ra.status === 401 || rg.status === 401) {
       setForbidden("login");
       return;
     }
-    const [a, g, d, h] = await Promise.all([ra.json(), rg.json(), rd.json(), rh.json()]);
+    const [a, g, d, h, n] = await Promise.all([ra.json(), rg.json(), rd.json(), rh.json(), rn.json()]);
     if (a.error === "Forbidden" || g.error === "Forbidden") {
       setForbidden("denied");
       return;
@@ -104,6 +107,26 @@ export default function AdminAjanPage() {
     setAgents(g.agents || []);
     setDemann(d.demandes || []);
     setHelps(h.demandes || []);
+    if (rn.ok && typeof n.on === "boolean") setTopupNotifyOn(n.on);
+  }
+
+  async function toggleTopupNotify() {
+    setTopupNotifySaving(true);
+    try {
+      const r = await fetch("/api/admin/ajan-topup-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ on: !topupNotifyOn }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Erè");
+      setTopupNotifyOn(Boolean(j.on));
+      toast.success(j.on ? "Notifikasyon top-up aktive." : "Notifikasyon top-up etenn.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erè");
+    } finally {
+      setTopupNotifySaving(false);
+    }
   }
 
   async function loadKrediAudit(uid: string) {
@@ -284,6 +307,31 @@ export default function AdminAjanPage() {
     <section className="mx-auto max-w-6xl">
         <h1 className="font-display text-3xl font-black tracking-tight text-brand-ink">Admin — Ajan yo</h1>
         <p className="mt-1 text-sm text-black/55">Jere aplikasyon, ajan aktif, ak demann peman.</p>
+
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-brand-ink">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-sm font-bold">Avèti m lè yon ajan achte kredi marchand</div>
+              <p className="mt-1 text-xs leading-relaxed text-black/55">
+                Yon imèl (Resend) apre chak top-up Stripe reyisi. Destinataè:{" "}
+                <code className="rounded bg-white/90 px-1 text-[11px]">ADMIN_NOTIFY_EMAIL</code> si li defini, sinon
+                premye imèl nan <code className="rounded bg-white/90 px-1 text-[11px]">ADMIN_EMAILS</code>. Fonksyon
+                Supabase <code className="rounded bg-white/90 px-1 text-[11px]">verifye-stripe</code> bezwen{" "}
+                <code className="rounded bg-white/90 px-1 text-[11px]">RESEND_API_KEY</code> nan sekre li tou.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant={topupNotifyOn ? "green" : "outline"}
+              size="sm"
+              className="shrink-0"
+              disabled={topupNotifySaving}
+              onClick={() => void toggleTopupNotify()}
+            >
+              {topupNotifySaving ? "…" : topupNotifyOn ? "Notifikasyon: ON" : "Notifikasyon: OFF"}
+            </Button>
+          </div>
+        </div>
 
         <div className="mt-6 flex flex-wrap gap-2">
           {(["app", "actif", "demann", "kredi", "aide"] as const).map((t) => (

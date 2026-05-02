@@ -93,6 +93,8 @@ export function monicanDisplayId(reference: string, year = new Date().getFullYea
   return `MON-${year}-${tail}`;
 }
 
+export type ReceiptVariant = "caisse" | "ajan";
+
 export type ReceiptWhatsAppPayload = {
   dateStr: string;
   timeStr: string;
@@ -104,8 +106,8 @@ export type ReceiptWhatsAppPayload = {
   txId: string;
 };
 
-export function buildWhatsAppReceiptMessage(p: ReceiptWhatsAppPayload): string {
-  return `✅ *MONICAN RECHARGE*
+export function buildWhatsAppReceiptMessage(p: ReceiptWhatsAppPayload, variant: ReceiptVariant = "caisse"): string {
+  const base = `✅ *MONICAN RECHARGE*
 recharge.monican.shop
 
 📅 ${p.dateStr} — ${p.timeStr}
@@ -121,7 +123,11 @@ recharge.monican.shop
 ✅ Transaction réussie!
 Merci pour votre confiance.
 
-🛍️ monican.shop
+🛍️ monican.shop`;
+  if (variant === "ajan") {
+    return `${base}`;
+  }
+  return `${base}
 📞 717-880-1479`;
 }
 

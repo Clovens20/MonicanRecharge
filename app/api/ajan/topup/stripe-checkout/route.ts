@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
-
-function appBaseUrl(): string | null {
-  const u = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
-  if (u) return u;
-  const v = process.env.VERCEL_URL?.trim();
-  if (v) return `https://${v.replace(/^https?:\/\//, "").replace(/\/$/, "")}`;
-  return null;
-}
+import { stripeCheckoutPublicBaseUrl } from "@/lib/stripe-app-base-url";
 
 export async function POST(req: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -35,8 +28,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Montan dwe ant $1 ak $5000" }, { status: 400 });
   }
 
-  const base = appBaseUrl();
-  if (!base) return NextResponse.json({ error: "NEXT_PUBLIC_APP_URL manke" }, { status: 503 });
+  const base = stripeCheckoutPublicBaseUrl();
+  if (!base) {
+    return NextResponse.json(
+      {
+        error:
+          "URL piblik Stripe pa bon (localhost entèdi an prod). Mete APP_URL oswa NEXT_PUBLIC_APP_URL (ex. https://recharge.monican.shop).",
+      },
+      { status: 503 },
+    );
+  }
 
   const stripe = new Stripe(stripeKey, { typescript: true });
   const session = await stripe.checkout.sessions.create({

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+function isKomisyonAdminCredit(ref: unknown): boolean {
+  return String(ref || "").startsWith("ADMIN-");
+}
+
 export async function GET() {
   const sb = createClient();
   if (!sb) return NextResponse.json({ error: "Supabase pa konfigire" }, { status: 503 });
@@ -15,7 +19,7 @@ export async function GET() {
 
   const { data: lines, error: e2 } = await sb
     .from("komisyon_tranzaksyon")
-    .select("montant_vann_usd, montant_komisyon, created_at")
+    .select("montant_vann_usd, montant_komisyon, created_at, tranzaksyon_ref")
     .eq("ajan_id", user.id)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -27,13 +31,32 @@ export async function GET() {
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   const rows = lines || [];
-  const today = rows.filter((r) => r.created_at >= startDay);
-  const month = rows.filter((r) => r.created_at >= startMonth);
+  const todayKom = rows.filter((r) => r.created_at >= startDay);
+  const monthKom = rows.filter((r) => r.created_at >= startMonth);
 
-  const txToday = today.length;
-  const revToday = today.reduce((s, r) => s + Number(r.montant_vann_usd || 0), 0);
-  const txMonth = month.length;
-  const komTotal = rows.reduce((s, r) => s + Number(r.montant_komisyon || 0), 0);
+  const todayKomSales = todayKom.filter((r) => !isKomisyonAdminCredit(r.tranzaksyon_ref));
+  const monthKomSales = monthKom.filter((r) => !isKomisyonAdminCredit(r.tranzaksyon_ref));
+
+  const { data: selfTxs, error: eTx } = await sb
+    .from("tranzaksyon")
+    .select("montant_usd, created_at")
+    .eq("user_id", user.id)
+    .eq("estati", "siksè")
+    .gte("created_at", startMonth)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (eTx) return NextResponse.json({ error: eTx.message }, { status: 500 });
+
+  const selfRows = selfTxs || [];
+  const todaySelf = selfRows.filter((r) => r.created_at >= startDay);
+  const monthSelf = selfRows.filter((r) => r.created_at >= startMonth);
+
+  const txToday = todayKomSales.length + todaySelf.length;
+  const revToday =
+    todayKomSales.reduce((s, r) => s + Number(r.montant_vann_usd || 0), 0) +
+    todaySelf.reduce((s, r) => s + Number(r.montant_usd || 0), 0);
+  const txMonth = monthKomSales.length + monthSelf.length;
 
   return NextResponse.json({
     agent,

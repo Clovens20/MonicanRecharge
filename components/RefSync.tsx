@@ -15,19 +15,21 @@ function cleanRef(raw: string | null): string | null {
 /** Synchronise ?ref= → localStorage (complément au cookie posé par middleware). */
 export function RefSync() {
   const sp = useSearchParams();
+  const refQ = sp.get("ref");
+  const crefQ = sp.get("cref");
   useEffect(() => {
-    const c = cleanRef(sp.get("ref"));
+    const c = cleanRef(refQ);
     if (c) {
       try {
         localStorage.setItem(LS_KEY, c);
       } catch {}
     }
-    const cref = cleanRef(sp.get("cref"));
+    const cref = cleanRef(crefQ);
     if (cref) {
       try {
         localStorage.setItem(LS_CREF, cref);
       } catch {}
     }
-  }, [sp]);
+  }, [refQ, crefQ]);
   return null;
 }

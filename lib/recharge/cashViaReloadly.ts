@@ -28,8 +28,12 @@ export async function sendCashRechargeViaReloadly(params: {
   /** Anrejistre kanal (caisse / online) ak kesye_id depi `/api/recharge/send`. */
   record: RechargeRecord;
   userId: string | null;
+  /** Frè platfòm sou pri vann (ajan sèlman), USD. */
+  platformFeeUsd?: number;
 }): Promise<{ ok: true; record: RechargeRecord } | { ok: false; error: string; status: number }> {
-  const { body, built, record: channelRecord, userId } = params;
+  const { body, built, record: channelRecord, userId, platformFeeUsd: feeRaw } = params;
+  const platformFeeUsd =
+    Number.isFinite(feeRaw) && (feeRaw as number) > 0 ? Math.round((feeRaw as number) * 100) / 100 : 0;
   const svc = getServiceSupabase();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -70,7 +74,7 @@ export async function sendCashRechargeViaReloadly(params: {
   if (prixVann + 0.0001 < prixKoutaj) {
     return { ok: false, error: "Pri vann pa ka pi piti pase pri recharge a.", status: 400 };
   }
-  const benefis = Math.round((prixVann - prixKoutaj) * 100) / 100;
+  const benefis = Math.round((prixVann - prixKoutaj - platformFeeUsd) * 100) / 100;
   const { data: inserted, error: insErr } = await svc
     .from("tranzaksyon")
     .insert({
@@ -83,6 +87,7 @@ export async function sendCashRechargeViaReloadly(params: {
       pri_koutaj: prixKoutaj,
       pri_vann: prixVann,
       benefis,
+      frais_platfòm_usd: platformFeeUsd,
       tip,
       plan_id: planIdStr,
       mòd_peman: "cash",

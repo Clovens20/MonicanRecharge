@@ -15,6 +15,7 @@ type D = {
   low: boolean;
   lastRecharge: string | null;
   reloadlyUrl: string;
+  totalAgentBalansKomisyonUsd?: number;
 };
 
 export function ReloadlyAdminStrip() {
@@ -149,6 +150,13 @@ export function ReloadlyAdminStrip() {
         <Link href={d.reloadlyUrl} target="_blank" rel="noreferrer" className="font-semibold text-emerald-800 underline">
           Recharje sou Reloadly →
         </Link>
+        <span
+          className="w-full text-[11px] leading-snug text-black/55 md:w-auto md:max-w-[28rem]"
+          title="Reloadly diminye lè yon recharge voye, pa lè ajan achte kredi Stripe."
+        >
+          Sòm balans ajan: {formatCurrency(d.totalAgentBalansKomisyonUsd ?? 0)} · Reloadly diminye nan voye recharge, pa
+          nan top-up Stripe.
+        </span>
       </div>
     </div>
   );

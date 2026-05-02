@@ -4,6 +4,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { isRechargeAdmin } from "@/lib/ajan/admin";
 import { getReloadlyLastRechargeAt, getReloadlyMinAlertUsd } from "@/lib/admin/reloadly-settings";
 import { getReloadlyBalanceUsdForAdmin } from "@/lib/reloadly/adminBalance";
+import { sumActiveAgentBalansKomisyonUsd } from "@/lib/admin/agent-balance-sum";
 
 export async function GET() {
   const sb = createClient();
@@ -19,6 +20,9 @@ export async function GET() {
   const lastRecharge = await getReloadlyLastRechargeAt();
   const low = balanceUsd < minAlert;
 
+  const svc = getServiceSupabase();
+  const totalAgentBalansKomisyonUsd = svc ? await sumActiveAgentBalansKomisyonUsd(svc) : 0;
+
   return NextResponse.json({
     balance: balanceUsd,
     balanceSource: source,
@@ -27,6 +31,7 @@ export async function GET() {
     low,
     lastRecharge,
     reloadlyUrl: "https://www.reloadly.com",
+    totalAgentBalansKomisyonUsd,
   });
 }
 

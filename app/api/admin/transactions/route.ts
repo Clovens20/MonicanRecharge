@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isRechargeAdmin } from "@/lib/ajan/admin";
 import { fetchTransactionsFiltered } from "@/lib/admin/mongo-stats";
-import { fetchSupabaseTransactionsFiltered } from "@/lib/admin/supabase-transactions";
+import {
+  fetchAjanTopupCardTransactionsFiltered,
+  fetchSupabaseTransactionsFiltered,
+} from "@/lib/admin/supabase-transactions";
 
 export async function GET(req: Request) {
   const sb = createClient();
@@ -25,11 +28,12 @@ export async function GET(req: Request) {
     search: searchParams.get("q") || undefined,
     limit: parseInt(searchParams.get("limit") || "200", 10),
   };
-  const [mongoRows, sbRows] = await Promise.all([
+  const [mongoRows, sbRows, topupRows] = await Promise.all([
     fetchTransactionsFiltered(q),
     fetchSupabaseTransactionsFiltered(q),
+    fetchAjanTopupCardTransactionsFiltered(q),
   ]);
-  const rows = [...sbRows, ...mongoRows].sort((a, b) => {
+  const rows = [...sbRows, ...topupRows, ...mongoRows].sort((a, b) => {
     const ta = new Date(String(a.created_at || 0)).getTime();
     const tb = new Date(String(b.created_at || 0)).getTime();
     return tb - ta;

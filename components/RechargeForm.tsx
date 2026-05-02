@@ -41,6 +41,7 @@ import { addTx, TxLocal } from "@/lib/store";
 import { cn, formatCurrency, formatHTG } from "@/lib/utils";
 import { getCashierName } from "@/lib/receipt/caisse";
 import { tryOpenCashDrawer } from "@/lib/receipt/caisse";
+import { computeAgentPlatformFeeUsd } from "@/lib/recharge/agentPlatformFee";
 
 const ReceiptSuccessPanel = dynamic(
   () => import("@/components/ReceiptSuccessPanel").then((m) => m.ReceiptSuccessPanel),
@@ -158,12 +159,7 @@ export function RechargeForm({
     const dial = dialForCountry(eff);
     const digits = nationalDigits(phone, dial);
 
-    if (eff === "HT") {
-      setDetectingOperator(false);
-      setOperator(detectOperator(phone, "HT"));
-      return;
-    }
-
+    /** HT : itilize `/api/reloadly/auto-detect` (Reloadly API an prod) olye de IDs mock ki ka pa koresponn ak katalog live (egz. 528 → UAE). */
     const ruleSet = PHONE_RULES[eff];
     const minDigits = ruleSet ? Math.min(...ruleSet.length) : 7;
     if (digits.length < minDigits) {
@@ -188,6 +184,7 @@ export function RechargeForm({
           operator?: { id: number; name: string; logoUrl?: string | null; countryCode?: string };
           source?: string;
           type?: string;
+          error?: string;
         } = {};
         try {
           j = JSON.parse(rawText) as typeof j;
@@ -200,12 +197,37 @@ export function RechargeForm({
           return;
         }
 
+        if (j.source === "reloadly_failed") {
+          if (!ac.signal.aborted) {
+            toast.error(typeof j.error === "string" && j.error ? j.error : "Operatè HT pa detekte sou Reloadly.");
+          }
+          setOperator(null);
+          return;
+        }
+
         const applyDetected = (id: number, name: string, logoUrl?: string | null, opCc?: string) => {
           const cc = opCc || effNow;
           const row = RECHARGE_COUNTRIES.find((c) => c.code === cc);
           if (cc !== country.code) {
             const nc = RECHARGE_COUNTRIES.find((c) => c.code === cc);
             if (nc) setCountry(nc);
+          }
+          if (cc === "HT") {
+            const n = name.toLowerCase();
+            const base = OPERATORS.find(
+              (o) =>
+                o.countryCode === "HT" &&
+                ((n.includes("natcom") && o.name.toLowerCase().includes("natcom")) ||
+                  (n.includes("digicel") && o.name.toLowerCase().includes("digicel"))),
+            );
+            if (base) {
+              setOperator({
+                ...base,
+                id,
+                logoUrl: logoUrl || base.logoUrl,
+              });
+              return;
+            }
           }
           setOperator({
             id,
@@ -313,10 +335,16 @@ export function RechargeForm({
     return Number.isFinite(p) ? p : effectiveRechargeUsd;
   }, [canAgentSetPrice, agentSellAmount, finalAmount, effectiveRechargeUsd]);
 
+  const agentPlatformFeeUsd = useMemo(() => {
+    if (!canAgentSetPrice) return 0;
+    return computeAgentPlatformFeeUsd(clientPriceAmount);
+  }, [canAgentSetPrice, clientPriceAmount]);
+
   const agentProfitUsd = useMemo(() => {
     if (!canAgentSetPrice) return 0;
-    return Math.round((clientPriceAmount - effectiveRechargeUsd) * 100) / 100;
-  }, [canAgentSetPrice, clientPriceAmount, effectiveRechargeUsd]);
+    const gross = Math.round((clientPriceAmount - effectiveRechargeUsd) * 100) / 100;
+    return Math.round((gross - agentPlatformFeeUsd) * 100) / 100;
+  }, [canAgentSetPrice, clientPriceAmount, effectiveRechargeUsd, agentPlatformFeeUsd]);
 
   useEffect(() => {
     if (!isAgentWalletMode) return;
@@ -1066,6 +1094,7 @@ export function RechargeForm({
                 nationalDigits={phone.replace(/\D/g, "")}
                 cashierName={cashierForReceipt}
                 onSkip={finishReceiptAndLeave}
+                receiptVariant={isAgentWalletMode ? "ajan" : "caisse"}
               />
             )}
 
@@ -1126,7 +1155,9 @@ export function RechargeForm({
                       </div>
                       {canAgentSetPrice ? (
                         <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                          Valè recharge: <strong>{formatCurrency(effectiveRechargeUsd)}</strong> · Benefis:{" "}
+                          Valè recharge: <strong>{formatCurrency(effectiveRechargeUsd)}</strong> · Debite kont ou:{" "}
+                          <strong>{formatCurrency(effectiveRechargeUsd + agentPlatformFeeUsd)}</strong> (kò + frè platfòm{" "}
+                          {formatCurrency(agentPlatformFeeUsd)}) · Benefis ou (net):{" "}
                           <strong>{formatCurrency(Math.max(agentProfitUsd, 0))}</strong>
                         </div>
                       ) : null}
@@ -1156,7 +1187,8 @@ export function RechargeForm({
                       />
                       <p className="mt-2 text-xs text-emerald-800/90">
                         Kliyan resevwa ~{formatHTG(effectiveRechargeUsd, operator.fxRate)} {operator.currency} pandan li peye{" "}
-                        {formatCurrency(clientPriceAmount)}. Benefis ou: {formatCurrency(Math.max(agentProfitUsd, 0))}.
+                        {formatCurrency(clientPriceAmount)}. Benefis ou (apre frè platfòm):{" "}
+                        {formatCurrency(Math.max(agentProfitUsd, 0))}.
                       </p>
                       {agentProfitUsd + 0.0001 < MIN_AGENT_PROFIT_USD ? (
                         <p className="mt-1 text-xs font-semibold text-red-700">
@@ -1267,3 +1299,5 @@ export function RechargeForm({
     </div>
   );
 }
+
+export default RechargeForm;

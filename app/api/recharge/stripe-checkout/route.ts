@@ -3,19 +3,11 @@ import { cookies } from "next/headers";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { stripeCheckoutPublicBaseUrl } from "@/lib/stripe-app-base-url";
 
 /** Libellés Stripe : ASCII sans accents (ex. Haïti → Haiti). */
 function stripDiacritics(s: string): string {
   return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-/** URL publique pour success/cancel Stripe (obligatoire). */
-function appBaseUrl(): string | null {
-  const u = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
-  if (u) return u;
-  const v = process.env.VERCEL_URL?.trim();
-  if (v) return `https://${v.replace(/^https?:\/\//, "").replace(/\/$/, "")}`;
-  return null;
 }
 
 /**
@@ -35,12 +27,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const base = appBaseUrl();
+  const base = stripeCheckoutPublicBaseUrl();
   if (!base) {
     return NextResponse.json(
       {
         error:
-          "NEXT_PUBLIC_APP_URL manquant (ex. https://recharge.monican.shop) — requis pour les URLs de retour Stripe.",
+          "URL publique Stripe absente ou invalide (localhost interdit en production). Définissez APP_URL ou NEXT_PUBLIC_APP_URL (ex. https://recharge.monican.shop).",
       },
       { status: 503 },
     );

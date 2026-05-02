@@ -5,6 +5,7 @@ import { isRechargeAdmin } from "@/lib/ajan/admin";
 import { todayStats, activeCustomersApprox } from "@/lib/admin/mongo-stats";
 import { getReloadlyMinAlertUsd } from "@/lib/admin/reloadly-settings";
 import { getReloadlyBalanceUsdForAdmin } from "@/lib/reloadly/adminBalance";
+import { sumActiveAgentBalansKomisyonUsd } from "@/lib/admin/agent-balance-sum";
 
 export async function GET() {
   const sb = createClient();
@@ -26,8 +27,10 @@ export async function GET() {
   let agents = 0;
   let moncashPending = 0;
   let pendingAjanApps = 0;
+  let totalAgentBalansKomisyonUsd = 0;
   const svc = getServiceSupabase();
   if (svc) {
+    totalAgentBalansKomisyonUsd = await sumActiveAgentBalansKomisyonUsd(svc);
     const { count: ac } = await svc.from("ajan").select("*", { count: "exact", head: true }).eq("estati", "aktif");
     agents = ac || 0;
     const { count: mc } = await svc
@@ -53,5 +56,6 @@ export async function GET() {
     agents,
     moncashPending,
     pendingAjanApps,
+    totalAgentBalansKomisyonUsd,
   });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { notifyAdminsAjanTopupPurchase } from "@/lib/notify/ajan-topup-admin-notify";
 
 type Body = { sessionId?: string };
 
@@ -74,6 +75,14 @@ export async function POST(req: Request) {
     await svc.from("ajan_topup_card").delete().eq("stripe_session_id", sessionId);
     return NextResponse.json({ error: eUp.message }, { status: 500 });
   }
+
+  const { data: agKod } = await svc.from("ajan").select("kòd_ajan").eq("user_id", user.id).maybeSingle();
+  void notifyAdminsAjanTopupPurchase({
+    ajanUserId: user.id,
+    amountUsd,
+    stripeSessionId: sessionId,
+    agentCode: agKod?.kòd_ajan ?? null,
+  });
 
   return NextResponse.json({ ok: true, credited: true, amountUsd, newBalance: balAfter });
 }

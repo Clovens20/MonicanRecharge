@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { buildRechargeFromBody, type RechargeBody, type RechargeRecord } from "@/lib/recharge/executeSend";
 import { sendCashRechargeViaReloadly } from "@/lib/recharge/cashViaReloadly";
+import { computeAgentPlatformFeeUsd } from "@/lib/recharge/agentPlatformFee";
 import { applyAgentCommission } from "@/lib/ajan/commission";
 import { verifyKesyeSession, KESYE_SESSION_COOKIE_NAME } from "@/lib/kesye/session-cookie";
 import { notifyRechargeSuccess } from "@/lib/notify/resend-notifications";
@@ -52,15 +53,17 @@ export async function POST(req: Request) {
 
   const minAgentProfit = parseFloat(process.env.AGENT_MIN_PROFIT_USD || "0.5");
   const isAgentChannel = body.channelHint === "ajan";
+  let agentPlatformFeeUsd = 0;
   if (isAgentChannel) {
     const sell = typeof body.sellAmountUsd === "number" ? body.sellAmountUsd : NaN;
     if (!Number.isFinite(sell) || sell <= 0) {
       return NextResponse.json({ success: false, error: "Pri kliyan an obligatwa pou ajan." }, { status: 400 });
     }
-    const profit = Math.round((sell - built.finalAmount) * 100) / 100;
-    if (profit + 0.0001 < minAgentProfit) {
+    agentPlatformFeeUsd = computeAgentPlatformFeeUsd(sell);
+    const profitNet = Math.round((sell - built.finalAmount - agentPlatformFeeUsd) * 100) / 100;
+    if (profitNet + 0.0001 < minAgentProfit) {
       return NextResponse.json(
-        { success: false, error: `Benefis minimòm ajan se $${minAgentProfit.toFixed(2)}.` },
+        { success: false, error: `Benefis minimòm ajan se $${minAgentProfit.toFixed(2)} (apre frè platfòm).` },
         { status: 400 }
       );
     }
@@ -99,10 +102,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Kont ajan pa jwenn" }, { status: 403 });
     }
     const bal = Number(ag.balans_komisyon || 0);
-    if (bal + 0.0001 < built.finalAmount) {
+    const totalDebit = Math.round((built.finalAmount + agentPlatformFeeUsd) * 100) / 100;
+    if (bal + 0.0001 < totalDebit) {
       return NextResponse.json({ success: false, error: "Solde ajan ensifizan." }, { status: 400 });
     }
-    const newBal = Math.round((bal - built.finalAmount) * 100) / 100;
+    const newBal = Math.round((bal - totalDebit) * 100) / 100;
     const { error: upErr } = await svc.from("ajan").update({ balans_komisyon: newBal }).eq("user_id", userId);
     if (upErr) {
       return NextResponse.json({ success: false, error: upErr.message }, { status: 500 });
@@ -111,7 +115,13 @@ export async function POST(req: Request) {
     agentOldBalance = bal;
   }
 
-  const shipped = await sendCashRechargeViaReloadly({ body, built, record, userId });
+  const shipped = await sendCashRechargeViaReloadly({
+    body,
+    built,
+    record,
+    userId,
+    platformFeeUsd: record.channel === "ajan" ? agentPlatformFeeUsd : 0,
+  });
   if (!shipped.ok) {
     if (agentDebited && userId) {
       const svc = getServiceSupabase();
