@@ -10,6 +10,7 @@ import { ThermalReceipt } from "@/components/ThermalReceipt";
 import {
   buildWhatsAppReceiptMessage,
   digitsForWhatsApp,
+  formatRecipientForReceipt,
   getAutoPrintReceipt,
   monicanDisplayId,
   maskRecipientForReceipt,
@@ -58,7 +59,10 @@ export function ReceiptSuccessPanel({ tx, dial, nationalDigits, cashierName, onS
     const payload: ReceiptWhatsAppPayload = {
       dateStr,
       timeStr,
-      phoneDisplay: maskRecipientForReceipt(dial, nationalDigits),
+      phoneDisplay:
+        receiptVariant === "caisse"
+          ? formatRecipientForReceipt(dial, nationalDigits)
+          : maskRecipientForReceipt(dial, nationalDigits),
       operator: tx.operator,
       amountUsd: tx.amount_usd.toFixed(2),
       htgApprox: formatHTG(tx.amount_usd, fx),

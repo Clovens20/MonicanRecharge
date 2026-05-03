@@ -80,12 +80,27 @@ export async function tryOpenCashDrawer(): Promise<boolean> {
   }
 }
 
-/** Affichage type +509 34XX XXXX sur le papier thermique. */
+/** Affichage type +509 34XX XXXX (resè piblik / ajan — vi prive). */
 export function maskRecipientForReceipt(dial: string, nationalDigits: string): string {
   const d = nationalDigits.replace(/\D/g, "");
   const prefix = dial.trim() || "+509";
   if (d.length < 4) return `${prefix} ${d}`;
   return `${prefix} ${d.slice(0, 2)}XX XXXX`;
+}
+
+/** Nimewo konplè, espas chak 2 chif (apre prefiks peyi) — resè kèsye sèlman. */
+export function formatRecipientForReceipt(dial: string, nationalDigits: string): string {
+  let d = nationalDigits.replace(/\D/g, "");
+  let prefix = dial.trim().replace(/\s/g, "") || "+509";
+  if (!prefix.startsWith("+")) prefix = `+${prefix.replace(/^\+/, "")}`;
+  if (!d) return prefix;
+  const ccDigits = prefix.replace(/\D/g, "");
+  if (ccDigits.length > 0 && d.startsWith(ccDigits) && d.length > ccDigits.length) {
+    d = d.slice(ccDigits.length);
+  }
+  if (!d) return prefix;
+  const grouped = d.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+  return `${prefix} ${grouped}`;
 }
 
 export function monicanDisplayId(reference: string, year = new Date().getFullYear()): string {

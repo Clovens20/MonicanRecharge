@@ -1091,7 +1091,7 @@ export function RechargeForm({
               <ReceiptSuccessPanel
                 tx={successTx}
                 dial={dialForCountry(successTx.country_code || country.code)}
-                nationalDigits={phone.replace(/\D/g, "")}
+                nationalDigits={nationalPhone}
                 cashierName={cashierForReceipt}
                 onSkip={finishReceiptAndLeave}
                 receiptVariant={isAgentWalletMode ? "ajan" : "caisse"}

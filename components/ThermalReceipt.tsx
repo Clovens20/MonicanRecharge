@@ -2,7 +2,13 @@
 
 import type { TxLocal } from "@/lib/store";
 import { formatCurrency, formatHTG } from "@/lib/utils";
-import { monicanDisplayId, maskRecipientForReceipt, paymentLabel, type ReceiptVariant } from "@/lib/receipt/caisse";
+import {
+  formatRecipientForReceipt,
+  monicanDisplayId,
+  maskRecipientForReceipt,
+  paymentLabel,
+  type ReceiptVariant,
+} from "@/lib/receipt/caisse";
 import type { Lang } from "@/lib/i18n/translations";
 
 export type ThermalReceiptProps = {
@@ -19,7 +25,8 @@ export function ThermalReceipt({ tx, dial, nationalDigits, cashierName, lang, va
   const created = new Date(tx.created_at);
   const dateStr = created.toLocaleDateString(lang === "kr" ? "fr-FR" : lang, { day: "2-digit", month: "2-digit", year: "numeric" });
   const timeStr = created.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-  const masked = maskRecipientForReceipt(dial, nationalDigits);
+  const phoneLine =
+    variant === "caisse" ? formatRecipientForReceipt(dial, nationalDigits) : maskRecipientForReceipt(dial, nationalDigits);
   const monId = monicanDisplayId(tx.reference);
   const pay = paymentLabel(tx.payment_method, lang);
   const fx = tx.amount_usd > 0 ? tx.amount_local / tx.amount_usd : 132;
@@ -44,7 +51,7 @@ export function ThermalReceipt({ tx, dial, nationalDigits, cashierName, lang, va
       <div>ID: {monId}</div>
       <div className="my-2 border-t border-dashed border-black/40" />
       <div className="font-bold uppercase">Destinataire</div>
-      <div>{masked}</div>
+      <div>{phoneLine}</div>
       <div>{tx.flag} {tx.operator}</div>
       <div className="my-2 border-t border-dashed border-black/40" />
       <div>
