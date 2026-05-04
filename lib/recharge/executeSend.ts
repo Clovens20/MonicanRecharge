@@ -3,6 +3,7 @@ import { DATA_PLANS, OPERATORS, type Operator } from "@/lib/reloadly/mock";
 import { countryByCode, dialForCountry } from "@/lib/reloadly/countries";
 import { getDb } from "@/lib/mongodb";
 import { applyAgentCommission } from "@/lib/ajan/commission";
+import { calculateFinalPrice, type MarkupConfig } from "@/lib/markup";
 
 export type RechargeBody = {
   operatorId?: number;
@@ -55,16 +56,28 @@ function genRef() {
   return `MR-${s}`;
 }
 
-/** Coût Reloadly mock (USD) — ajuster quand API réelle branchée. */
-function estimateCostUsd(sellUsd: number): number {
+/** Estimation coût interne Reloadly (USD) — daprè montant nominal voye nan API a. */
+function estimateCostUsd(reloadlyDenominationUsd: number): number {
   const rate = parseFloat(process.env.RELOADLY_COST_RATIO || "0.92");
-  return Math.round(sellUsd * rate * 100) / 100;
+  return Math.round(reloadlyDenominationUsd * rate * 100) / 100;
 }
+
+export type BuildRechargeOk = {
+  ok: true;
+  record: RechargeRecord;
+  /** Pri total kliyan (même chif li peye — markup inclusif sou non-ajan). */
+  finalAmount: number;
+  /** Montant nominal voye nan Reloadly (aprè retire markup sou non-ajan). */
+  reloadlyCostUsd: number;
+  /** % markup global nan config (0 si disabled oswa vann ajan). */
+  markupPctApplied: number;
+};
 
 export function buildRechargeFromBody(
   body: RechargeBody,
-  refKod: string | null
-): { ok: true; record: RechargeRecord; finalAmount: number } | { ok: false; error: string } {
+  refKod: string | null,
+  markup: MarkupConfig,
+): BuildRechargeOk | { ok: false; error: string } {
   const ccRaw = body.recipientPhone?.countryCode;
   const cc = String(ccRaw || "").toUpperCase().slice(0, 2);
   const num = body.recipientPhone?.number;
@@ -88,16 +101,39 @@ export function buildRechargeFromBody(
   }
   if (!op) return { ok: false, error: "Operator not found" };
 
-  let finalAmount = body.amount ?? 0;
+  let customerPaysUsd = Number(body.amount ?? 0);
   if (body.type === "data_plan" && body.planId) {
     const plan = DATA_PLANS.find((p) => p.id === body.planId);
     if (!plan) return { ok: false, error: "Plan not found" };
-    finalAmount = plan.priceUsd;
+    customerPaysUsd = plan.priceUsd;
   }
-  if (!finalAmount || finalAmount <= 0) return { ok: false, error: "Invalid amount" };
+  if (!customerPaysUsd || customerPaysUsd <= 0) return { ok: false, error: "Invalid amount" };
+
+  const isAgentWallet = body.channelHint === "ajan";
+  let saleAmountUsd: number;
+  /** Nominal Reloadly (API) — sou non-ajan: aprè retire markup sou `customerPaysUsd`. */
+  let reloadlyCostUsd: number;
+  let markupPctApplied = 0;
+  if (isAgentWallet) {
+    reloadlyCostUsd = customerPaysUsd;
+    const rawSell = typeof body.sellAmountUsd === "number" ? body.sellAmountUsd : Number.NaN;
+    if (!Number.isFinite(rawSell) || rawSell <= 0) {
+      return { ok: false, error: "Pri kliyan an obligatwa pou ajan." };
+    }
+    const sell = Math.round(rawSell * 100) / 100;
+    if (sell + 0.0001 < reloadlyCostUsd) {
+      return { ok: false, error: "Pri vann pa ka pi piti pase pri recharge a." };
+    }
+    saleAmountUsd = sell;
+  } else {
+    const calc = calculateFinalPrice(customerPaysUsd, markup);
+    saleAmountUsd = calc.finalPrice;
+    reloadlyCostUsd = calc.costPrice;
+    markupPctApplied = markup.enabled ? markup.percentage : 0;
+  }
 
   const maxTx = parseFloat(process.env.RECHARGE_MAX_USD || "100");
-  if (Number(finalAmount) > maxTx) {
+  if (saleAmountUsd > maxTx) {
     return { ok: false, error: `Montan depase max ($${maxTx})` };
   }
 
@@ -114,7 +150,7 @@ export function buildRechargeFromBody(
       : pay === "moncash"
         ? "moncash_manual"
         : "online";
-  const cost = estimateCostUsd(Number(finalAmount));
+  const cost = estimateCostUsd(reloadlyCostUsd);
 
   const record: RechargeRecord = {
     id: txId,
@@ -123,8 +159,8 @@ export function buildRechargeFromBody(
     operator: op.name,
     country_code: cc,
     recipient: `${dial} ${num}`,
-    amount_usd: Number(finalAmount),
-    amount_local: Math.round(Number(finalAmount) * op.fxRate),
+    amount_usd: saleAmountUsd,
+    amount_local: Math.round(saleAmountUsd * op.fxRate),
     currency: op.currency,
     type: body.type ?? "airtime",
     plan_id: body.planId ?? null,
@@ -139,7 +175,13 @@ export function buildRechargeFromBody(
     cost_usd: cost,
   };
 
-  return { ok: true, record, finalAmount: Number(finalAmount) };
+  return {
+    ok: true,
+    record,
+    finalAmount: saleAmountUsd,
+    reloadlyCostUsd,
+    markupPctApplied,
+  };
 }
 
 export async function persistRechargeAndCommission(

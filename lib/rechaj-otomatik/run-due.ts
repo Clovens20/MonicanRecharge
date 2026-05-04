@@ -1,6 +1,8 @@
 import Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { buildRechargeFromBody, persistRechargeAndCommission, type RechargeBody } from "@/lib/recharge/executeSend";
+import { getGlobalMarkupConfig } from "@/lib/admin/markup-settings";
+import { calculateFinalPrice } from "@/lib/markup";
 import { notifyRechargeSuccess } from "@/lib/notify/resend-notifications";
 import { runAfterSuccessfulRecharge } from "@/lib/recharge/post-success";
 import { nextPwochenDateIso } from "@/lib/rechaj-otomatik/next-date";
@@ -67,9 +69,11 @@ export async function processDueAutoRecharges(): Promise<{ ok: number; skip: num
     email = authData.user.email || null;
     body.userEmail = email;
 
+    const markupCfg = await getGlobalMarkupConfig();
+    const chargeUsd = calculateFinalPrice(Number(row.montant), markupCfg).finalPrice;
     try {
       await stripe.paymentIntents.create({
-        amount: Math.round(Number(row.montant) * 100),
+        amount: Math.round(chargeUsd * 100),
         currency: "usd",
         customer: row.stripe_customer_id,
         payment_method: row.stripe_payment_method_id,
@@ -82,7 +86,7 @@ export async function processDueAutoRecharges(): Promise<{ ok: number; skip: num
       continue;
     }
 
-    const built = buildRechargeFromBody(body, null);
+    const built = buildRechargeFromBody(body, null, markupCfg);
     if (!built.ok) {
       err.push(`${row.id}: ${built.error}`);
       continue;

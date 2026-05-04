@@ -500,6 +500,8 @@ export function RechargeForm({
         void tryOpenCashDrawer();
       }
 
+      /** Sou reçu / UI kliyan : montant li mete (markup ret nan sistèm san montre li). */
+      const paidUsd = canAgentSetPrice ? clientPriceAmount : effectiveRechargeUsd;
       const tx: TxLocal = {
         id: data.id,
         reference: data.reference,
@@ -509,8 +511,8 @@ export function RechargeForm({
         flag: operator.flag,
         country_code: operator.countryCode,
         recipient: `${dialForCountry(operator.countryCode)} ${phone}`,
-        amount_usd: canAgentSetPrice ? clientPriceAmount : effectiveRechargeUsd,
-        amount_local: effectiveRechargeUsd * operator.fxRate,
+        amount_usd: paidUsd,
+        amount_local: paidUsd * operator.fxRate,
         currency: operator.currency,
         type,
         plan: plan ? DATA_PLANS.find((p) => p.id === plan)?.name : null,

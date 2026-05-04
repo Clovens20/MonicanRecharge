@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { isRechargeAdmin } from "@/lib/ajan/admin";
 import { buildRechargeFromBody, persistRechargeAndCommission, type RechargeBody } from "@/lib/recharge/executeSend";
+import { getGlobalMarkupConfig } from "@/lib/admin/markup-settings";
 import { notifyRechargeSuccess } from "@/lib/notify/resend-notifications";
 import { runAfterSuccessfulRecharge } from "@/lib/recharge/post-success";
 
@@ -36,7 +37,8 @@ export async function POST(req: Request) {
 
   const payload = row.payload as { recharge: RechargeBody; refKod: string | null };
   const ref = payload.refKod || null;
-  const built = buildRechargeFromBody({ ...payload.recharge, paymentMethod: "moncash" }, ref);
+  const markup = await getGlobalMarkupConfig();
+  const built = buildRechargeFromBody({ ...payload.recharge, paymentMethod: "moncash" }, ref, markup);
   if (!built.ok) return NextResponse.json({ error: built.error }, { status: 400 });
 
   await persistRechargeAndCommission(built.record, built.finalAmount, ref, { delayMs: 600 });

@@ -3,6 +3,46 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.1";
 import Stripe from "npm:stripe@17.4.0";
 import { corsOptions, jsonResponse } from "../_shared/cors.ts";
 
+const MARKUP_KLE = "global_markup";
+
+type MarkupCfg = { enabled: boolean; percentage: number; minFlatFee: number };
+const DEFAULT_MARKUP: MarkupCfg = { enabled: false, percentage: 7, minFlatFee: 0.3 };
+
+async function loadMarkupCfg(supabase: ReturnType<typeof createClient>): Promise<MarkupCfg> {
+  const { data } = await supabase.from("admin_settings").select("valè").eq("kle", MARKUP_KLE).maybeSingle();
+  const v = data?.valè as Record<string, unknown> | null;
+  if (!v || typeof v !== "object") return { ...DEFAULT_MARKUP };
+  const enabled = Boolean(v.enabled);
+  const p = Number(v.percentage);
+  const m = Number(v.minFlatFee);
+  return {
+    enabled,
+    percentage: Number.isFinite(p) ? Math.min(100, Math.max(0, p)) : DEFAULT_MARKUP.percentage,
+    minFlatFee: Number.isFinite(m) && m >= 0 ? Math.min(50, m) : DEFAULT_MARKUP.minFlatFee,
+  };
+}
+
+/** Markup inclusif : `customerPays` = total client ; retounen pri Reloadly (nominal) ak total peye. */
+function splitInclusiveMarkup(customerPays: number, cfg: MarkupCfg): {
+  reloadlyDenomUsd: number;
+  finalPrice: number;
+  markupPctSnapshot: number;
+} {
+  if (!Number.isFinite(customerPays) || customerPays <= 0) {
+    return { reloadlyDenomUsd: 0, finalPrice: 0, markupPctSnapshot: 0 };
+  }
+  const finalPrice = Math.round(customerPays * 100) / 100;
+  if (!cfg.enabled) {
+    return { reloadlyDenomUsd: finalPrice, finalPrice, markupPctSnapshot: 0 };
+  }
+  const pctPart = finalPrice * (cfg.percentage / 100);
+  let markupAmount = Math.round(Math.max(pctPart, cfg.minFlatFee) * 100) / 100;
+  const maxMarkup = Math.max(0, finalPrice - 0.01);
+  markupAmount = Math.min(markupAmount, maxMarkup);
+  const reloadlyDenomUsd = Math.round((finalPrice - markupAmount) * 100) / 100;
+  return { reloadlyDenomUsd, finalPrice, markupPctSnapshot: cfg.percentage };
+}
+
 /**
  * Crée une session Stripe Checkout + ligne `tranzaksyon` (annatant).
  * JWT utilisateur requis (verify_jwt) — `user_id` pris depuis le token, pas depuis le body.
@@ -69,15 +109,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "operatorId invalide" }, 400);
     }
 
-    const prixKoutaj = Number(amount);
-    if (!Number.isFinite(prixKoutaj) || prixKoutaj <= 0) {
+    const montantKliyan = Number(amount);
+    if (!Number.isFinite(montantKliyan) || montantKliyan <= 0) {
       return jsonResponse({ error: "amount invalide" }, 400);
     }
 
-    const prixVann = Math.ceil(prixKoutaj * 1.08 * 100) / 100;
-    const benefisBrut = prixVann - prixKoutaj;
-
     const supabase = createClient(supabaseUrl, serviceKey);
+    const mk = await loadMarkupCfg(supabase);
+    const { reloadlyDenomUsd, finalPrice: prixVann, markupPctSnapshot } = splitInclusiveMarkup(montantKliyan, mk);
+    const benefisBrut = Math.round((prixVann - reloadlyDenomUsd) * 100) / 100;
 
     const refSan = String(refKod || "")
       .trim()
@@ -107,9 +147,10 @@ Deno.serve(async (req) => {
       pays_kòd: String(countryCode).toUpperCase().slice(0, 2),
       nimewo_resevwa: String(recipientPhone),
       montant_usd: prixVann,
-      pri_koutaj: prixKoutaj,
+      pri_koutaj: reloadlyDenomUsd,
       pri_vann: prixVann,
       benefis: benefisNet,
+      markup_pct_applied: markupPctSnapshot,
       tip: tip || "airtime",
       plan_id: planId ?? null,
       mòd_peman: "stripe",
@@ -144,7 +185,7 @@ Deno.serve(async (req) => {
             currency: "usd",
             product_data: {
               name: `Recharge ${String(operatorName).normalize("NFD").replace(/[\u0300-\u036f]/g, "")} - ${recipientPhone}`,
-              description: `${tip === "airtime" ? "Airtime" : "Forfait data"} $${prixKoutaj}`,
+              description: `${tip === "airtime" ? "Airtime" : "Forfait data"} — total $${prixVann.toFixed(2)} USD`,
             },
             unit_amount: Math.round(prixVann * 100),
           },
@@ -156,7 +197,7 @@ Deno.serve(async (req) => {
         operatorId: String(operatorId),
         recipientPhone: String(recipientPhone),
         countryCode: String(countryCode).toUpperCase().slice(0, 2),
-        amount: String(prixKoutaj),
+        amount: String(reloadlyDenomUsd),
         tip: tip || "airtime",
         userId,
         planId: planId ?? "",

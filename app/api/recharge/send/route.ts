@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { buildRechargeFromBody, type RechargeBody, type RechargeRecord } from "@/lib/recharge/executeSend";
+import { getGlobalMarkupConfig } from "@/lib/admin/markup-settings";
 import { sendCashRechargeViaReloadly } from "@/lib/recharge/cashViaReloadly";
 import { computeAgentPlatformFeeUsd } from "@/lib/recharge/agentPlatformFee";
 import { applyAgentCommission } from "@/lib/ajan/commission";
@@ -48,7 +49,8 @@ export async function POST(req: Request) {
     userEmail = user?.email ?? userEmail;
   }
 
-  const built = buildRechargeFromBody(body, ref);
+  const markup = await getGlobalMarkupConfig();
+  const built = buildRechargeFromBody(body, ref, markup);
   if (!built.ok) return NextResponse.json({ success: false, error: built.error }, { status: 400 });
 
   const minAgentProfit = parseFloat(process.env.AGENT_MIN_PROFIT_USD || "0.5");
@@ -60,7 +62,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Pri kliyan an obligatwa pou ajan." }, { status: 400 });
     }
     agentPlatformFeeUsd = computeAgentPlatformFeeUsd(sell);
-    const profitNet = Math.round((sell - built.finalAmount - agentPlatformFeeUsd) * 100) / 100;
+    const profitNet = Math.round((sell - built.reloadlyCostUsd - agentPlatformFeeUsd) * 100) / 100;
     if (profitNet + 0.0001 < minAgentProfit) {
       return NextResponse.json(
         { success: false, error: `Benefis minimòm ajan se $${minAgentProfit.toFixed(2)} (apre frè platfòm).` },
@@ -102,7 +104,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Kont ajan pa jwenn" }, { status: 403 });
     }
     const bal = Number(ag.balans_komisyon || 0);
-    const totalDebit = Math.round((built.finalAmount + agentPlatformFeeUsd) * 100) / 100;
+    const totalDebit = Math.round((built.reloadlyCostUsd + agentPlatformFeeUsd) * 100) / 100;
     if (bal + 0.0001 < totalDebit) {
       return NextResponse.json({ success: false, error: "Solde ajan ensifizan." }, { status: 400 });
     }

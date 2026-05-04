@@ -4,6 +4,8 @@ import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { stripeCheckoutPublicBaseUrl } from "@/lib/stripe-app-base-url";
+import { getGlobalMarkupConfig } from "@/lib/admin/markup-settings";
+import { calculateFinalPrice } from "@/lib/markup";
 
 /** Libellés Stripe : ASCII sans accents (ex. Haïti → Haiti). */
 function stripDiacritics(s: string): string {
@@ -86,13 +88,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "operatorId invalide" }, { status: 400 });
   }
 
-  const prixKoutaj = Number(amount);
-  if (!Number.isFinite(prixKoutaj) || prixKoutaj <= 0) {
+  const montantKliyan = Number(amount);
+  if (!Number.isFinite(montantKliyan) || montantKliyan <= 0) {
     return NextResponse.json({ error: "amount invalide" }, { status: 400 });
   }
 
-  const prixVann = Math.ceil(prixKoutaj * 1.08 * 100) / 100;
-  const benefisBrut = prixVann - prixKoutaj;
+  const markup = await getGlobalMarkupConfig();
+  const priced = calculateFinalPrice(montantKliyan, markup);
+  const prixVann = priced.finalPrice;
+  const priKoutajReloadly = priced.costPrice;
+  const markupPctSnapshot = markup.enabled ? markup.percentage : 0;
+  const benefisBrut = Math.round((prixVann - priKoutajReloadly) * 100) / 100;
 
   let ref_kòd: string | null = null;
   let ajan_id: string | null = null;
@@ -118,9 +124,10 @@ export async function POST(req: Request) {
     pays_kòd: String(countryCode).toUpperCase().slice(0, 2),
     nimewo_resevwa: String(recipientPhone),
     montant_usd: prixVann,
-    pri_koutaj: prixKoutaj,
+    pri_koutaj: priKoutajReloadly,
     pri_vann: prixVann,
     benefis: benefisNet,
+    markup_pct_applied: markupPctSnapshot,
     tip: tip || "airtime",
     plan_id: planId ?? null,
     mòd_peman: "stripe",
@@ -152,7 +159,7 @@ export async function POST(req: Request) {
             currency: "usd",
             product_data: {
               name: `Recharge ${stripDiacritics(String(operatorName))} - ${recipientPhone}`,
-              description: `${tip === "airtime" ? "Airtime" : "Forfait data"} $${prixKoutaj}`,
+              description: `${tip === "airtime" ? "Airtime" : "Forfait data"} — total $${prixVann.toFixed(2)} USD`,
             },
             unit_amount: Math.round(prixVann * 100),
           },
@@ -164,7 +171,7 @@ export async function POST(req: Request) {
         operatorId: String(operatorId),
         recipientPhone: String(recipientPhone),
         countryCode: String(countryCode).toUpperCase().slice(0, 2),
-        amount: String(prixKoutaj),
+        amount: String(priKoutajReloadly),
         tip: tip || "airtime",
         userId: user.id,
         planId: planId ?? "",

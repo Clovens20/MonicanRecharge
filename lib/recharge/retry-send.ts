@@ -2,6 +2,7 @@ import { getDb } from "@/lib/mongodb";
 import { applyAgentCommission } from "@/lib/ajan/commission";
 import { notifyRechargeSuccess } from "@/lib/notify/resend-notifications";
 import { buildRechargeFromBody, type RechargeBody, type RechargeRecord } from "@/lib/recharge/executeSend";
+import { getGlobalMarkupConfig } from "@/lib/admin/markup-settings";
 
 export type FailedTxDoc = {
   id: string;
@@ -17,7 +18,8 @@ export type FailedTxDoc = {
 export async function attemptReloadlyRetry(doc: FailedTxDoc): Promise<{ ok: boolean; error?: string }> {
   if (!doc.retry_payload) return { ok: false, error: "missing retry_payload" };
   const ref = doc.ajan_kod ?? null;
-  const built = buildRechargeFromBody(doc.retry_payload, ref);
+  const markup = await getGlobalMarkupConfig();
+  const built = buildRechargeFromBody(doc.retry_payload, ref, markup);
   if (!built.ok) return { ok: false, error: built.error };
 
   const db = await getDb();

@@ -24,7 +24,7 @@ function bundleIdForDataPlan(planId: string | null | undefined): number | null {
  */
 export async function sendCashRechargeViaReloadly(params: {
   body: RechargeBody;
-  built: { record: RechargeRecord; finalAmount: number };
+  built: { record: RechargeRecord; finalAmount: number; reloadlyCostUsd: number; markupPctApplied: number };
   /** Anrejistre kanal (caisse / online) ak kesye_id depi `/api/recharge/send`. */
   record: RechargeRecord;
   userId: string | null;
@@ -68,9 +68,10 @@ export async function sendCashRechargeViaReloadly(params: {
     bundleId = bid;
   }
 
-  const prixKoutaj = built.finalAmount;
+  const prixKoutaj = Math.round(built.reloadlyCostUsd * 100) / 100;
   const rawSell = typeof body.sellAmountUsd === "number" ? body.sellAmountUsd : Number.NaN;
-  const prixVann = Number.isFinite(rawSell) && rawSell > 0 ? rawSell : prixKoutaj;
+  const prixVann =
+    Number.isFinite(rawSell) && rawSell > 0 ? Math.round(rawSell * 100) / 100 : Math.round(built.finalAmount * 100) / 100;
   if (prixVann + 0.0001 < prixKoutaj) {
     return { ok: false, error: "Pri vann pa ka pi piti pase pri recharge a.", status: 400 };
   }
@@ -88,6 +89,7 @@ export async function sendCashRechargeViaReloadly(params: {
       pri_vann: prixVann,
       benefis,
       frais_platfòm_usd: platformFeeUsd,
+      markup_pct_applied: built.markupPctApplied,
       tip,
       plan_id: planIdStr,
       mòd_peman: "cash",
@@ -183,6 +185,8 @@ export async function sendCashRechargeViaReloadly(params: {
   const costRatio = parseFloat(process.env.RELOADLY_COST_RATIO || "0.92");
   const costUsd = Math.round(prixKoutaj * costRatio * 100) / 100;
 
+  const fxLocal =
+    channelRecord.amount_usd > 0 ? channelRecord.amount_local / channelRecord.amount_usd : 1;
   const record: RechargeRecord = {
     ...channelRecord,
     id: transactionId,
@@ -192,7 +196,7 @@ export async function sendCashRechargeViaReloadly(params: {
     mock: false,
     cost_usd: costUsd,
     amount_usd: prixVann,
-    amount_local: Math.round(prixKoutaj * (channelRecord.amount_local / Math.max(channelRecord.amount_usd, 0.0001))),
+    amount_local: Math.round(prixVann * fxLocal),
   };
 
   return { ok: true, record };

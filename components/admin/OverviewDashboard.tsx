@@ -23,6 +23,9 @@ const COLORS = ["#10B981", "#F59E0B", "#6366F1", "#EC4899", "#111827"];
 type Overview = {
   todayRev: number;
   todayTx: number;
+  markupProfitToday?: number;
+  markupProfit7d?: number;
+  markupProfit30d?: number;
   reloadly: number;
   reloadlyBalanceSource?: "live" | "env";
   reloadlyLow: boolean;
@@ -84,6 +87,13 @@ export function OverviewDashboard() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Stat label="💰 Revni jodi a" value={ov ? formatCurrency(ov.todayRev) : "—"} />
               <Stat label="⚡ Tranzaksyon jodi a" value={ov ? String(ov.todayTx) : "—"} />
+              <Stat
+                label="📈 Marge brute (jodi a)"
+                value={ov != null ? formatCurrency(ov.markupProfitToday ?? 0) : "—"}
+                hint="Σ (pri vann − pri koutaj) tranzaksyon siksè (Supabase, max 8000 liy)."
+              />
+              <Stat label="📈 Marge 7 jou" value={ov != null ? formatCurrency(ov.markupProfit7d ?? 0) : "—"} />
+              <Stat label="📈 Marge 30 jou" value={ov != null ? formatCurrency(ov.markupProfit30d ?? 0) : "—"} />
               <Stat
                 label="🟢 Reloadly balans"
                 value={ov ? formatCurrency(ov.reloadly) : "—"}

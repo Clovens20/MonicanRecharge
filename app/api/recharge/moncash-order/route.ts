@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { buildRechargeFromBody, type RechargeBody } from "@/lib/recharge/executeSend";
+import { getGlobalMarkupConfig } from "@/lib/admin/markup-settings";
 import { sendAdminEmail } from "@/lib/notify/resend-notifications";
 import { sendWhatsAppIfConfigured } from "@/lib/notify/twilio-whatsapp";
 
@@ -28,7 +29,8 @@ export async function POST(req: Request) {
   const ref = raw || null;
   const { refKod: _r, ...recharge } = body;
 
-  const built = buildRechargeFromBody(recharge as RechargeBody, ref);
+  const markup = await getGlobalMarkupConfig();
+  const built = buildRechargeFromBody(recharge as RechargeBody, ref, markup);
   if (!built.ok) return NextResponse.json({ error: built.error }, { status: 400 });
 
   const svc = getServiceSupabase();

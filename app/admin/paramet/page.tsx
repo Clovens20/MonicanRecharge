@@ -13,6 +13,11 @@ export default function AdminParametPage() {
         <section className="rounded-2xl border border-black/5 bg-white p-5">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-black/50">Paj admin</h2>
           <ul className="mt-3 space-y-2 text-sm">
+            <li>
+              <Link href="/admin/markup" className="font-medium text-emerald-700 hover:underline">
+                Markup kliyan (pri global) →
+              </Link>
+            </li>
             {ADMIN_NAV_LINKS.filter((l) => l.key !== "paramet").map((l) => (
               <li key={l.key}>
                 <Link href={l.href} className="font-medium text-emerald-700 hover:underline">
