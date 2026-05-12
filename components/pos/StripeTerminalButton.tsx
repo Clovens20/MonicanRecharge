@@ -59,8 +59,8 @@ export function StripeTerminalButton({
     <div className={styles.container}>
       <div className={styles.header}>
         <div>
-          <div className={styles.title}>Stripe Terminal M2</div>
-          <div className={styles.subtitle}>Paiement carte en direct sur le lecteur Bluetooth</div>
+          <div className={styles.title}>Stripe Terminal S700</div>
+          <div className={styles.subtitle}>Paiement carte en direct sur le lecteur WiFi</div>
         </div>
         {readerLabel ? <div className={styles.readerLabel}>{readerLabel}</div> : null}
       </div>
@@ -78,7 +78,7 @@ export function StripeTerminalButton({
             onClick={() => void connectReader()}
             disabled={disabled || isBusy}
           >
-            {isConnecting || isDiscovering ? "Connexion..." : "Connecter le terminal M2"}
+            {isConnecting || isDiscovering ? "Connexion..." : "🟢 Connecter le terminal S700"}
           </button>
         ) : (
           <>
@@ -102,7 +102,7 @@ export function StripeTerminalButton({
                 onClick={() => void disconnectReader()}
                 disabled={isProcessing}
               >
-                Deconnecter
+                Deconnecter le S700
               </button>
             )}
           </>

@@ -28,11 +28,7 @@ type TerminalReader = {
 
 type TerminalApi = {
   discoverReaders: (config?: Record<string, unknown>) => Promise<{ discoveredReaders?: TerminalReader[]; error?: { message?: string } }>;
-  connectReader?: (
-    reader: TerminalReader,
-    options?: Record<string, unknown>,
-  ) => Promise<{ reader?: TerminalReader; error?: { message?: string } }>;
-  connectBluetoothReader?: (
+  connectReader: (
     reader: TerminalReader,
     options?: Record<string, unknown>,
   ) => Promise<{ reader?: TerminalReader; error?: { message?: string } }>;
@@ -150,18 +146,18 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
             readerLabelRef.current = "";
             setReaderLabel("");
             setStatus("idle");
-            setStatusMessage("Terminal deconnecte, reconnectez le lecteur");
+            setStatusMessage("S700 deconnecte - verifiez la connexion WiFi");
           },
           onConnectionStatusChange: (event) => {
             if (!mounted) return;
             if (event.status === "connecting") {
               setStatus("connecting");
-              setStatusMessage("Connexion au lecteur M2...");
+              setStatusMessage("Connexion au Stripe Reader S700...");
               return;
             }
             if (event.status === "connected") {
               setStatus("connected");
-              setStatusMessage(readerRef.current ? `Lecteur pret: ${readerLabelRef.current || "Stripe Reader M2"}` : "Lecteur connecte");
+              setStatusMessage(readerRef.current ? `Lecteur pret: ${readerLabelRef.current || "Stripe Reader S700"}` : "Lecteur connecte");
               return;
             }
             if (event.status === "not_connected" && !readerRef.current) {
@@ -173,7 +169,7 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
             if (!mounted) return;
             if (event.status === "waiting_for_input") {
               setStatus("collecting");
-              setStatusMessage("Carte attendue sur le terminal...");
+              setStatusMessage("En attente de la carte sur le terminal S700...");
               return;
             }
             if (event.status === "processing") {
@@ -183,7 +179,7 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
             }
             if (event.status === "ready" && readerRef.current) {
               setStatus("connected");
-              setStatusMessage(`Lecteur pret: ${readerLabelRef.current || "Stripe Reader M2"}`);
+              setStatusMessage(`Lecteur pret: ${readerLabelRef.current || "Stripe Reader S700"}`);
             }
           },
         }) as unknown as TerminalApi;
@@ -227,21 +223,12 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
       }
 
       setStatus("discovering");
-      setStatusMessage(config.simulated ? "Recherche du lecteur simule..." : "Recherche du lecteur Bluetooth M2...");
+      setStatusMessage(config.simulated ? "Recherche du lecteur simule..." : "Recherche du Stripe Reader S700 sur le reseau...");
 
-      let discoverResult: { discoveredReaders?: TerminalReader[]; error?: { message?: string } };
-      try {
-        discoverResult = await terminal.discoverReaders({
-          simulated: Boolean(config.simulated),
-          location: config.locationId,
-          discoveryMethod: "bluetoothScan",
-        });
-      } catch {
-        discoverResult = await terminal.discoverReaders({
-          simulated: Boolean(config.simulated),
-          location: config.locationId,
-        });
-      }
+      const discoverResult = await terminal.discoverReaders({
+        simulated: Boolean(config.simulated),
+        location: config.locationId ?? undefined,
+      });
 
       if (discoverResult.error) {
         throw new Error(discoverResult.error.message || "Aucun lecteur trouve");
@@ -252,24 +239,19 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
         throw new Error(
           config.simulated
             ? "Aucun lecteur simule disponible"
-            : "Aucun lecteur M2 detecte. Verifiez Bluetooth et la proximite du lecteur.",
+            : "Aucun lecteur S700 trouve. Verifiez que le terminal est allume et connecte au WiFi.",
         );
       }
 
       setStatus("connecting");
-      setStatusMessage("Connexion au lecteur M2...");
+      setStatusMessage("Connexion au Stripe Reader S700...");
 
       const connectOptions = {
         fail_if_in_use: true,
         failIfInUse: true,
-        locationId: config.locationId,
       };
 
-      const connectResult = terminal.connectReader
-        ? await terminal.connectReader(reader, connectOptions)
-        : terminal.connectBluetoothReader
-          ? await terminal.connectBluetoothReader(reader, connectOptions)
-          : { error: { message: "SDK Stripe Terminal incompatible avec ce lecteur" } };
+      const connectResult = await terminal.connectReader(reader, connectOptions);
 
       if (connectResult.error || !connectResult.reader) {
         throw new Error(connectResult.error?.message || "Connexion au lecteur echouee");
@@ -280,7 +262,7 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
         connectResult.reader.label ||
         connectResult.reader.serial_number ||
         connectResult.reader.device_type ||
-        "Stripe Reader M2";
+        "Stripe Reader S700";
       readerLabelRef.current = label;
       setReaderLabel(label);
       setStatus("connected");
@@ -344,7 +326,7 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
         paymentIntentIdRef.current = data.id;
 
         setStatus("collecting");
-        setStatusMessage("Carte attendue sur le terminal...");
+        setStatusMessage("En attente de la carte sur le terminal S700...");
 
         const collectResult = await terminal.collectPaymentMethod(data.clientSecret);
         if (collectResult.error || !collectResult.paymentIntent) {
@@ -353,7 +335,7 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
         }
 
         setStatus("processing");
-        setStatusMessage("Confirmation du paiement sur le terminal...");
+        setStatusMessage("Confirmation du paiement sur le terminal S700...");
 
         const processResult = await terminal.processPayment(collectResult.paymentIntent);
         if (processResult.error || !processResult.paymentIntent?.id) {
@@ -429,7 +411,7 @@ export function useStripeTerminal(): UseStripeTerminalReturn {
 
     await cancelServerPaymentIntent();
     setStatus(readerRef.current ? "connected" : "idle");
-    setStatusMessage(readerRef.current ? `Lecteur pret: ${readerLabelRef.current || "Stripe Reader M2"}` : "Terminal non connecte");
+    setStatusMessage(readerRef.current ? `Lecteur pret: ${readerLabelRef.current || "Stripe Reader S700"}` : "Terminal non connecte");
   }, [cancelServerPaymentIntent]);
 
   return {
