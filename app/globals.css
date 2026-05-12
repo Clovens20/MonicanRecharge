@@ -126,24 +126,44 @@ html, body {
 
 /* ——— ZHONGJI / thermal 80mm (window.print) ——— */
 @media print {
+  html,
+  body {
+    width: 80mm !important;
+    min-width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
   #receipt,
   #receipt * {
-    visibility: visible;
+    visibility: visible !important;
   }
   #receipt {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    max-width: 80mm;
+    position: static !important;
+    margin: 0 auto !important;
+    width: 72mm !important;
+    min-width: 72mm !important;
+    max-width: 72mm !important;
+    padding: 3mm 0 4mm !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    overflow: visible !important;
     font-family: "Courier New", Courier, monospace;
-    font-size: 12px;
-    line-height: 1.35;
-    color: #000;
-    background: #fff;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    color: #000 !important;
+    background: #fff !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   .print\:hidden {
     display: none !important;
