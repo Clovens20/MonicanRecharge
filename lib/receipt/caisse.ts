@@ -23,7 +23,7 @@ export function setCashierName(name: string) {
   localStorage.setItem(KEY_CASHIER, name.trim());
 }
 
-export function paymentLabel(method: "stripe" | "moncash" | "cash", lang: "en" | "fr" | "es" | "kr"): string {
+export function paymentLabel(method: "stripe" | "moncash" | "cash" | "stripe_terminal", lang: "en" | "fr" | "es" | "kr"): string {
   if (method === "cash") {
     if (lang === "fr") return "Cash";
     if (lang === "kr") return "Lajan kach";
@@ -31,6 +31,12 @@ export function paymentLabel(method: "stripe" | "moncash" | "cash", lang: "en" |
     return "Cash";
   }
   if (method === "moncash") return "Moncash";
+  if (method === "stripe_terminal") {
+    if (lang === "fr") return "Carte presente (Terminal Stripe)";
+    if (lang === "kr") return "Kat sou Terminal Stripe";
+    if (lang === "es") return "Tarjeta presente (Terminal Stripe)";
+    return "Card present (Stripe Terminal)";
+  }
   if (lang === "fr") return "Kat / Card (Stripe)";
   if (lang === "kr") return "Kat Strip";
   if (lang === "es") return "Tarjeta (Stripe)";

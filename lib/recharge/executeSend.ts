@@ -11,7 +11,8 @@ export type RechargeBody = {
   amount?: number | null;
   type?: "airtime" | "data_plan";
   planId?: string | null;
-  paymentMethod?: "stripe" | "moncash" | "cash";
+  paymentMethod?: "stripe" | "moncash" | "cash" | "stripe_terminal";
+  stripePaymentIntentId?: string | null;
   userEmail?: string | null;
   /** Lè vann depi tablo kès (tablèt). */
   channelHint?: "caisse" | "online" | "ajan";
@@ -36,7 +37,7 @@ export type RechargeRecord = {
   currency: string;
   type: "airtime" | "data_plan";
   plan_id: string | null;
-  payment_method: "stripe" | "moncash" | "cash";
+  payment_method: "stripe" | "moncash" | "cash" | "stripe_terminal";
   user_email: string | null;
   status: "siksè" | "annatant" | "echwe";
   created_at: string;

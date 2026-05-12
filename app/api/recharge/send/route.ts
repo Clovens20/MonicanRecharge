@@ -4,13 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { buildRechargeFromBody, type RechargeBody, type RechargeRecord } from "@/lib/recharge/executeSend";
 import { getGlobalMarkupConfig } from "@/lib/admin/markup-settings";
-import { sendCashRechargeViaReloadly } from "@/lib/recharge/cashViaReloadly";
+import { sendPaidRechargeViaReloadly } from "@/lib/recharge/cashViaReloadly";
 import { computeAgentPlatformFeeUsd } from "@/lib/recharge/agentPlatformFee";
 import { applyAgentCommission } from "@/lib/ajan/commission";
 import { verifyKesyeSession, KESYE_SESSION_COOKIE_NAME } from "@/lib/kesye/session-cookie";
 import { notifyRechargeSuccess } from "@/lib/notify/resend-notifications";
 import { assertRechargeAllowed } from "@/lib/security/recharge-guards";
 import { runAfterSuccessfulRecharge } from "@/lib/recharge/post-success";
+import { getStripeTerminalServer } from "@/lib/stripe-terminal/server";
 
 export async function POST(req: Request) {
   let body: RechargeBody;
@@ -20,8 +21,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  /** Paiement carte : Stripe Checkout (edge `kreye-checkout`) → webhook → `voye-recharge`. Pas d’envoi Reloadly ici. */
-  if (body.paymentMethod !== "cash") {
+  /** Paiement carte en ligne : Stripe Checkout (edge `kreye-checkout`) → webhook → `voye-recharge`. Pas d’envoi Reloadly ici. */
+  if (body.paymentMethod !== "cash" && body.paymentMethod !== "stripe_terminal") {
     return NextResponse.json(
       {
         success: false,
@@ -50,8 +51,12 @@ export async function POST(req: Request) {
   }
 
   const markup = await getGlobalMarkupConfig();
-  const built = buildRechargeFromBody(body, ref, markup);
-  if (!built.ok) return NextResponse.json({ success: false, error: built.error }, { status: 400 });
+  const builtResult = buildRechargeFromBody(body, ref, markup);
+  if (!builtResult.ok) {
+    const error = (builtResult as { ok: false; error: string }).error;
+    return NextResponse.json({ success: false, error }, { status: 400 });
+  }
+  const built = builtResult;
 
   const minAgentProfit = parseFloat(process.env.AGENT_MIN_PROFIT_USD || "0.5");
   const isAgentChannel = body.channelHint === "ajan";
@@ -76,6 +81,61 @@ export async function POST(req: Request) {
   if (kesyeId) {
     record = { ...record, channel: "caisse", kesye_id: kesyeId };
   }
+  if (body.paymentMethod === "stripe_terminal") {
+    if (!kesyeId) {
+      return NextResponse.json({ success: false, error: "Stripe Terminal mande yon sesyon kèsye aktif." }, { status: 403 });
+    }
+
+    const stripePaymentIntentId = String(body.stripePaymentIntentId || "").trim();
+    if (!stripePaymentIntentId) {
+      return NextResponse.json({ success: false, error: "stripePaymentIntentId obligatwa." }, { status: 400 });
+    }
+
+    const stripe = getStripeTerminalServer();
+    if (!stripe) {
+      return NextResponse.json({ success: false, error: "STRIPE_SECRET_KEY manquant." }, { status: 503 });
+    }
+
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
+      const expectedAmount = Math.round(built.finalAmount * 100);
+      const metadataSource = String(paymentIntent.metadata?.source || "");
+      const metadataKesyeId = String(paymentIntent.metadata?.kesye_id || "");
+      if (!["requires_capture", "succeeded"].includes(paymentIntent.status)) {
+        return NextResponse.json(
+          { success: false, error: `PaymentIntent Stripe invalide pour la caisse: ${paymentIntent.status}` },
+          { status: 400 },
+        );
+      }
+      if (paymentIntent.capture_method !== "manual") {
+        return NextResponse.json(
+          { success: false, error: "Le paiement Terminal doit utiliser capture_method=manual." },
+          { status: 400 },
+        );
+      }
+      if (paymentIntent.currency.toLowerCase() !== "usd") {
+        return NextResponse.json({ success: false, error: "Le paiement Terminal doit etre en USD." }, { status: 400 });
+      }
+      if (paymentIntent.amount !== expectedAmount) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Montant Stripe Terminal inattendu (${(paymentIntent.amount / 100).toFixed(2)} USD).`,
+          },
+          { status: 400 },
+        );
+      }
+      if (metadataSource && metadataSource !== "pos_terminal_m2") {
+        return NextResponse.json({ success: false, error: "PaymentIntent Stripe Terminal non reconnu." }, { status: 400 });
+      }
+      if (metadataKesyeId && metadataKesyeId !== kesyeId) {
+        return NextResponse.json({ success: false, error: "Ce paiement Terminal appartient a une autre session kèsye." }, { status: 400 });
+      }
+    } catch (error) {
+      console.error("Stripe Terminal verify payment intent error:", error);
+      return NextResponse.json({ success: false, error: "Verification Stripe Terminal impossible." }, { status: 500 });
+    }
+  }
 
   const h = headers();
   const clientIp = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "0.0.0.0";
@@ -89,7 +149,9 @@ export async function POST(req: Request) {
     channel: record.channel,
   });
   if (!guard.ok) {
-    return NextResponse.json({ success: false, error: guard.error }, { status: guard.status });
+    const error = (guard as { ok: false; error: string; status: number }).error;
+    const status = (guard as { ok: false; error: string; status: number }).status;
+    return NextResponse.json({ success: false, error }, { status });
   }
 
   let agentDebited = false;
@@ -117,19 +179,23 @@ export async function POST(req: Request) {
     agentOldBalance = bal;
   }
 
-  const shipped = await sendCashRechargeViaReloadly({
+  const shipped = await sendPaidRechargeViaReloadly({
     body,
     built,
     record,
     userId,
     platformFeeUsd: record.channel === "ajan" ? agentPlatformFeeUsd : 0,
+    paymentMethod: body.paymentMethod === "stripe_terminal" ? "stripe_terminal" : "cash",
+    stripePaymentId: body.paymentMethod === "stripe_terminal" ? String(body.stripePaymentIntentId || "").trim() || null : null,
   });
   if (!shipped.ok) {
     if (agentDebited && userId) {
       const svc = getServiceSupabase();
       if (svc) await svc.from("ajan").update({ balans_komisyon: agentOldBalance }).eq("user_id", userId);
     }
-    return NextResponse.json({ success: false, error: shipped.error }, { status: shipped.status });
+    const error = (shipped as { ok: false; error: string; status: number }).error;
+    const status = (shipped as { ok: false; error: string; status: number }).status;
+    return NextResponse.json({ success: false, error }, { status });
   }
 
   const okRecord = shipped.record;

@@ -1,0 +1,159 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1.5px solid #dbe2ea;
+  border-radius: 1rem;
+  background: #ffffff;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.readerLabel {
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.idle {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.discovering,
+.connecting {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.connected {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.collecting {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.processing {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.success {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.error,
+.cancelled {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.btnConnect,
+.btnCharge,
+.btnCancel,
+.btnDisconnect {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.85rem;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.btnConnect:hover,
+.btnCharge:hover,
+.btnCancel:hover,
+.btnDisconnect:hover {
+  transform: translateY(-1px);
+}
+
+.btnConnect {
+  background: #635bff;
+  color: #ffffff;
+  box-shadow: 0 10px 24px -14px rgba(99, 91, 255, 0.9);
+}
+
+.btnCharge {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #ffffff;
+  box-shadow: 0 10px 24px -14px rgba(34, 197, 94, 0.8);
+}
+
+.btnCancel {
+  background: transparent;
+  border: 1.5px solid #fca5a5;
+  color: #dc2626;
+}
+
+.btnDisconnect {
+  background: transparent;
+  border: 1.5px solid #cbd5e1;
+  color: #475569;
+}
+
+.btnConnect:disabled,
+.btnCharge:disabled,
+.btnCancel:disabled,
+.btnDisconnect:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

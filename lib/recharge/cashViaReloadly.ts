@@ -19,10 +19,11 @@ function bundleIdForDataPlan(planId: string | null | undefined): number | null {
 }
 
 /**
- * Peman kès (cash) : anrejistre `tranzaksyon` (annatant) puis Edge `voye-recharge` → Reloadly.
+ * Peman deja valide bò POS la (cash oswa Stripe Terminal) :
+ * anrejistre `tranzaksyon` (annatant) puis Edge `voye-recharge` → Reloadly.
  * Pa gen « siksè » san konfirmasyon Reloadly.
  */
-export async function sendCashRechargeViaReloadly(params: {
+export async function sendPaidRechargeViaReloadly(params: {
   body: RechargeBody;
   built: { record: RechargeRecord; finalAmount: number; reloadlyCostUsd: number; markupPctApplied: number };
   /** Anrejistre kanal (caisse / online) ak kesye_id depi `/api/recharge/send`. */
@@ -30,8 +31,18 @@ export async function sendCashRechargeViaReloadly(params: {
   userId: string | null;
   /** Frè platfòm sou pri vann (ajan sèlman), USD. */
   platformFeeUsd?: number;
+  paymentMethod: "cash" | "stripe_terminal";
+  stripePaymentId?: string | null;
 }): Promise<{ ok: true; record: RechargeRecord } | { ok: false; error: string; status: number }> {
-  const { body, built, record: channelRecord, userId, platformFeeUsd: feeRaw } = params;
+  const {
+    body,
+    built,
+    record: channelRecord,
+    userId,
+    platformFeeUsd: feeRaw,
+    paymentMethod,
+    stripePaymentId,
+  } = params;
   const platformFeeUsd =
     Number.isFinite(feeRaw) && (feeRaw as number) > 0 ? Math.round((feeRaw as number) * 100) / 100 : 0;
   const svc = getServiceSupabase();
@@ -92,7 +103,8 @@ export async function sendCashRechargeViaReloadly(params: {
       markup_pct_applied: built.markupPctApplied,
       tip,
       plan_id: planIdStr,
-      mòd_peman: "cash",
+      mòd_peman: paymentMethod,
+      stripe_payment_id: stripePaymentId || null,
       estati: "annatant",
     })
     .select("id, created_at")

@@ -16,7 +16,7 @@ export type TxLocal = {
   type: "airtime" | "data_plan";
   plan?: string | null;
   status: "siksè" | "annatant" | "echwe";
-  payment_method: "stripe" | "moncash" | "cash";
+  payment_method: "stripe" | "moncash" | "cash" | "stripe_terminal";
   created_at: string;
 };
 

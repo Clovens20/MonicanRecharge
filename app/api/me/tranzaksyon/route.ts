@@ -48,7 +48,13 @@ function mapRow(row: Row, userEmail: string | undefined): TxLocal {
 
   const pm = row.mòd_peman;
   const payment_method: TxLocal["payment_method"] =
-    pm === "cash" ? "cash" : pm === "moncash" ? "moncash" : "stripe";
+    pm === "cash"
+      ? "cash"
+      : pm === "moncash"
+        ? "moncash"
+        : pm === "stripe_terminal"
+          ? "stripe_terminal"
+          : "stripe";
 
   return {
     id: row.id,

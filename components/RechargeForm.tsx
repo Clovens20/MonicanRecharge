@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
@@ -42,11 +42,20 @@ import { cn, formatCurrency, formatHTG } from "@/lib/utils";
 import { getCashierName } from "@/lib/receipt/caisse";
 import { tryOpenCashDrawer } from "@/lib/receipt/caisse";
 import { computeAgentPlatformFeeUsd } from "@/lib/recharge/agentPlatformFee";
+import { StripeTerminalButton } from "@/components/pos/StripeTerminalButton";
 
 const ReceiptSuccessPanel = dynamic(
   () => import("@/components/ReceiptSuccessPanel").then((m) => m.ReceiptSuccessPanel),
   { ssr: false },
 );
+
+type RechargeSendResponse = {
+  success?: boolean;
+  error?: string;
+  id?: string;
+  reference?: string;
+  created_at?: string;
+};
 
 export function RechargeForm({
   compact = false,
@@ -90,8 +99,10 @@ export function RechargeForm({
   const [agentSellAmount, setAgentSellAmount] = useState("");
   const [agentReceiveLocal, setAgentReceiveLocal] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [terminalBusy, setTerminalBusy] = useState(false);
   const [successTx, setSuccessTx] = useState<TxLocal | null>(null);
   const [cashierForReceipt, setCashierForReceipt] = useState("");
+  const terminalPendingTxRef = useRef<TxLocal | null>(null);
 
   useEffect(() => {
     const sync = () => setOnline(navigator.onLine !== false);
@@ -440,6 +451,123 @@ export function RechargeForm({
     window.location.assign(data.url);
   }
 
+  function resetSaleFlow() {
+    setPhone("");
+    setOperator(null);
+    setAmount(null);
+    setCustomAmount("");
+    setAgentSellAmount("");
+    setAgentReceiveLocal("");
+    setPlan(null);
+    setStep(1);
+  }
+
+  function currentCashierLabel() {
+    return (
+      (typeof window !== "undefined" ? getCashierName() : "") ||
+      (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_CAISSE_DEFAULT_NAME : "") ||
+      "—"
+    );
+  }
+
+  function finishSuccessfulRecharge(tx: TxLocal) {
+    addTx(tx);
+    toast.success(t("status.success"));
+    setCashierForReceipt(currentCashierLabel());
+    if (showReceiptPanel) {
+      setSuccessTx(tx);
+      setStep(5);
+      return;
+    }
+    resetSaleFlow();
+  }
+
+  async function submitRechargeSale(method: "cash" | "stripe_terminal", stripePaymentIntentId?: string): Promise<TxLocal> {
+    if (!operator || !phone || !finalAmount) {
+      throw new Error("Please complete all steps");
+    }
+
+    let refKod: string | null = null;
+    try {
+      refKod = localStorage.getItem("monican_ref");
+    } catch {
+      refKod = null;
+    }
+    const refFinal = isAgentWalletMode ? undefined : (refKod || agentRefCode || "").trim() || undefined;
+
+    const isCaisse = Boolean(pathname?.startsWith("/recharge") && kesyeOk);
+    const channelHint = isAgentWalletMode ? ("ajan" as const) : isCaisse ? ("caisse" as const) : undefined;
+
+    const response = await fetch("/api/recharge/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operatorId: operator.id,
+        recipientPhone: { countryCode: operator.countryCode, number: nationalPhone },
+        amount: effectiveRechargeUsd,
+        sellAmountUsd: canAgentSetPrice ? clientPriceAmount : undefined,
+        type,
+        planId: plan,
+        paymentMethod: method,
+        stripePaymentIntentId: stripePaymentIntentId || undefined,
+        userEmail: null,
+        refKod: refFinal,
+        channelHint,
+        ...operatorMetaPayload(),
+      }),
+    });
+    const data = (await response.json()) as RechargeSendResponse;
+    if (!data.success || !data.id || !data.reference) {
+      throw new Error(data.error || "Failed");
+    }
+
+    if (isCaisse && method === "cash") {
+      // Tentative ouverture tiroir (ZHONGJI/ESC-POS) après vente cash validée.
+      void tryOpenCashDrawer();
+    }
+
+    const paidUsd = canAgentSetPrice ? clientPriceAmount : effectiveRechargeUsd;
+    return {
+      id: data.id,
+      reference: data.reference,
+      user_email: null,
+      operator: operator.name,
+      operator_id: operator.id,
+      flag: operator.flag,
+      country_code: operator.countryCode,
+      recipient: `${dialForCountry(operator.countryCode)} ${phone}`,
+      amount_usd: paidUsd,
+      amount_local: paidUsd * operator.fxRate,
+      currency: operator.currency,
+      type,
+      plan: plan ? DATA_PLANS.find((p) => p.id === plan)?.name : null,
+      status: "siksè",
+      payment_method: method,
+      created_at: data.created_at || new Date().toISOString(),
+    };
+  }
+
+  async function authorizeTerminalRecharge(stripePaymentIntentId: string) {
+    terminalPendingTxRef.current = null;
+    const tx = await submitRechargeSale("stripe_terminal", stripePaymentIntentId);
+    terminalPendingTxRef.current = tx;
+  }
+
+  function finalizeTerminalRecharge() {
+    const tx = terminalPendingTxRef.current;
+    terminalPendingTxRef.current = null;
+    if (!tx) {
+      toast.error("Paiement capture, mais la recharge locale est introuvable.");
+      return;
+    }
+    finishSuccessfulRecharge(tx);
+  }
+
+  function handleTerminalPaymentError(error: string) {
+    terminalPendingTxRef.current = null;
+    toast.error(error || "Paiement Stripe Terminal echoue");
+  }
+
   async function handleSubmit() {
     if (!operator || !phone || !finalAmount) {
       toast.error("Please complete all steps");
@@ -461,86 +589,13 @@ export function RechargeForm({
     }
     setSubmitting(true);
     try {
-      let refKod: string | null = null;
-      try {
-        refKod = localStorage.getItem("monican_ref");
-      } catch {}
-      const refFinal = isAgentWalletMode ? undefined : (refKod || agentRefCode || "").trim() || undefined;
-
-      const isCaisse = Boolean(pathname?.startsWith("/recharge") && kesyeOk);
-      const channelHint = isAgentWalletMode ? ("ajan" as const) : isCaisse ? ("caisse" as const) : undefined;
-
       if (paymentMethod === "stripe") {
         await startStripeCheckout();
         return;
       }
 
-      const res = await fetch("/api/recharge/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operatorId: operator.id,
-          recipientPhone: { countryCode: operator.countryCode, number: nationalPhone },
-          amount: effectiveRechargeUsd,
-          sellAmountUsd: canAgentSetPrice ? clientPriceAmount : undefined,
-          type,
-          planId: plan,
-          paymentMethod: "cash",
-          userEmail: null,
-          refKod: refFinal,
-          channelHint,
-          ...operatorMetaPayload(),
-        }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Failed");
-
-      if (isCaisse && paymentMethod === "cash") {
-        // Tentative ouverture tiroir (ZHONGJI/ESC-POS) après vente cash validée.
-        void tryOpenCashDrawer();
-      }
-
-      /** Sou reçu / UI kliyan : montant li mete (markup ret nan sistèm san montre li). */
-      const paidUsd = canAgentSetPrice ? clientPriceAmount : effectiveRechargeUsd;
-      const tx: TxLocal = {
-        id: data.id,
-        reference: data.reference,
-        user_email: null,
-        operator: operator.name,
-        operator_id: operator.id,
-        flag: operator.flag,
-        country_code: operator.countryCode,
-        recipient: `${dialForCountry(operator.countryCode)} ${phone}`,
-        amount_usd: paidUsd,
-        amount_local: paidUsd * operator.fxRate,
-        currency: operator.currency,
-        type,
-        plan: plan ? DATA_PLANS.find((p) => p.id === plan)?.name : null,
-        status: "siksè",
-        payment_method: paymentMethod,
-        created_at: new Date().toISOString(),
-      };
-      addTx(tx);
-      toast.success(t("status.success"));
-      const ca =
-        (typeof window !== "undefined" ? getCashierName() : "") ||
-        (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_CAISSE_DEFAULT_NAME : "") ||
-        "—";
-      setCashierForReceipt(ca);
-      if (showReceiptPanel) {
-        setSuccessTx(tx);
-        setStep(5);
-      } else {
-        // Landing/public flow: on garde la recharge, sans afficher le panel reçu caisse.
-        setPhone("");
-        setOperator(null);
-        setAmount(null);
-        setCustomAmount("");
-        setAgentSellAmount("");
-        setAgentReceiveLocal("");
-        setPlan(null);
-        setStep(1);
-      }
+      const tx = await submitRechargeSale("cash");
+      finishSuccessfulRecharge(tx);
     } catch (e: any) {
       toast.error(e.message || t("status.failed"));
     } finally {
@@ -550,18 +605,22 @@ export function RechargeForm({
 
   function finishReceiptAndLeave() {
     setSuccessTx(null);
-    setStep(1);
-    setPhone("");
-    setOperator(null);
-    setAmount(null);
-    setCustomAmount("");
-    setAgentSellAmount("");
-    setAgentReceiveLocal("");
-    setPlan(null);
+    resetSaleFlow();
     router.push("/tableau-de-bord");
   }
 
   const stepDots = [1, 2, 3, 4];
+  const terminalDisabled =
+    submitting ||
+    terminalBusy ||
+    !operator ||
+    !phone ||
+    !finalAmount ||
+    (canAgentSetPrice &&
+      (!Number.isFinite(clientPriceAmount) ||
+        clientPriceAmount <= 0 ||
+        clientPriceAmount + 0.0001 < effectiveRechargeUsd ||
+        agentProfitUsd + 0.0001 < MIN_AGENT_PROFIT_USD));
 
   return (
     <div
@@ -1206,6 +1265,7 @@ export function RechargeForm({
                       type="button"
                       data-testid="pay-stripe"
                       onClick={() => setPaymentMethod("stripe")}
+                      disabled={terminalBusy}
                       className={cn(
                         "flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition-all",
                         paymentMethod === "stripe"
@@ -1231,6 +1291,7 @@ export function RechargeForm({
                           setPaymentMethod("cash");
                           void tryOpenCashDrawer();
                         }}
+                        disabled={terminalBusy}
                         className={cn(
                           "flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition-all",
                           paymentMethod === "cash"
@@ -1257,6 +1318,17 @@ export function RechargeForm({
                     </div>
                   )}
 
+                  {isStoreUi && kesyeOk ? (
+                    <StripeTerminalButton
+                      total={canAgentSetPrice ? clientPriceAmount : effectiveRechargeUsd}
+                      onBeforeCapture={authorizeTerminalRecharge}
+                      onPaymentSuccess={finalizeTerminalRecharge}
+                      onPaymentError={handleTerminalPaymentError}
+                      onBusyChange={setTerminalBusy}
+                      disabled={terminalDisabled}
+                    />
+                  ) : null}
+
                   <div className="flex gap-3 pt-1">
                     <Button
                       data-testid="back-step3"
@@ -1271,7 +1343,7 @@ export function RechargeForm({
                       variant="green"
                       size="lg"
                       className={cn("flex-1", L && "bg-[#00D084] hover:bg-emerald-400 shadow-[0_8px_30px_rgba(0,208,132,0.35)]")}
-                      disabled={submitting}
+                      disabled={submitting || terminalBusy}
                       onClick={handleSubmit}
                     >
                       {submitting ? (
